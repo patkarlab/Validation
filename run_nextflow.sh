@@ -22,21 +22,35 @@ echo "WARNING : change the bedfile and the cnv reference"
 # 06112021_Leukemia_Panel_sorted.bed : "/home/pipelines/NextSeq_mutation_detector_leukemia/scripts/cnvkit_ref_GeneNames/Reference_labelled.cnn" 
 # Leukemia_Panel_Myeloid_2023_Feb_hg37_sortd.bed : "/home/pipelines/NextSeq_mutation_detector_leukemia/scripts/cnvkit_combpanel/Reference_combpanel.cnn"
 
-#source activate new_base
-#nextflow -c /home/pipelines/NextSeq_mutation_detector_leukemia/nextflow.config run test_nf_scripts/main_v5_acmg.nf -entry MIPS \
-#--bedfile /home/pipelines/mutation_detector_nextflow/bedfile/Leukemia_Panel_Myeloid_2023_Feb_hg37_sortd \
-#--cnvkitRef /home/pipelines/NextSeq_mutation_detector_leukemia/scripts/cnvkit_combpanel/Reference_combpanel.cnn \
-#--sequences /home/pipelines/NextSeq_mutation_detector_leukemia/sequences/ \
-#--input /home/pipelines/NextSeq_mutation_detector_leukemia/samplesheet.csv \
-#-resume -bg
-#conda deactivate 
-#change bedfile name,without .bed extension
 
 source activate new_base
 nextflow -c /home/diagnostics/pipelines/Validation/nextflow.config run validation.nf -entry  VALIDATION \
---bedfile /home/pipelines/mutation_detector_nextflow/bedfile/Targets-XGEN_TALL_DNA_hg19_sortd \
---trans_bedfile /home/pipelines/MMpanel/bedfiles/MMPanel_translocation_sortd \
---cnvkitRef /home/pipelines/NextSeq_mutation_detector_leukemia/scripts/cnvkit_mmpanel/Reference_combpanel.cnn \
+--bedfile /home/pipelines/mutation_detector_nextflow/bedfile/CNV_Small_TALL_RNA_DNA_IGVH_sortd \
+--cnvkitRef /home/pipelines/NextSeq_mutation_detector_leukemia/scripts/cnvkit_combpanel/Reference_combpanel.cnn \
 --sequences /home/diagnostics/pipelines/Validation/sequences/ \
 --input /home/diagnostics/pipelines/Validation/samplesheet.csv \
 -resume -bg
+conda deactivate 
+#change bedfile name,without .bed extension
+
+# For CNV myeloid panel
+#source activate new_base
+#nextflow -c  /home/diagnostics/pipelines/Validation/nextflow.config run validation.nf -entry VALIDATION \
+#--bedfile /home/pipelines/mutation_detector_nextflow/bedfile/CNV_Small_hg19_newmyeloid_sortd \
+#--trans_bedfile /home/pipelines/MMpanel/bedfiles/MMPanel_translocation_sortd \
+#--cnvkitRef /home/pipelines/MMpanel/scripts/cnvkit_cnvmyeloid/Reference_combpanel.cnn \
+#--gene_scatter_list /home/pipelines/MMpanel/scripts/cnvkit_cnvmyeloid \
+#--sequences /home/diagnostics/pipelines/Validation/sequences/ \
+#--input /home/diagnostics/pipelines/Validation/samplesheet.csv \
+#-resume -bg
+#conda deactivate
+
+#source activate new_base
+#nextflow -c /home/diagnostics/pipelines/Validation/nextflow.config run validation.nf -entry  VALIDATION \
+#--bedfile /home/pipelines/mutation_detector_nextflow/bedfile/TALL_RNA_DNA_comb_hg19_sortd \
+#--trans_bedfile /home/pipelines/MMpanel/bedfiles/MMPanel_translocation_sortd \
+#--cnvkitRef /home/pipelines/NextSeq_mutation_detector_leukemia/scripts/cnvkit_mmpanel/Reference_combpanel.cnn \
+#--sequences /home/diagnostics/pipelines/Validation/sequences/ \
+#--input /home/diagnostics/pipelines/Validation/samplesheet.csv \
+#-resume -bg
+#conda deactivate
