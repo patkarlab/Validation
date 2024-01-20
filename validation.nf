@@ -28,6 +28,24 @@ process trimming_trimmomatic {
 	"""
 }
 
+process minimap_getitd {
+	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*_getitd'
+	input:
+		val (Sample)
+	output:
+		path "*_getitd"
+	script:
+	"""
+	minimap2 -ax sr ${params.genome_minimap_getitd} ${params.sequences}/${Sample}_*R1_*.fastq.gz ${params.sequences}/${Sample}_*R2_*.fastq.gz > ${Sample}.sam
+	${params.samtools} view -b -h ${Sample}.sam -o ${Sample}.bam
+	${params.samtools} sort ${Sample}.bam -o ${Sample}.sorted.bam
+	${params.samtools} index ${Sample}.sorted.bam
+	${params.samtools} view ${Sample}.sorted.bam -b -h chr13 > ${Sample}.chr13.bam
+	${params.bedtools} bamtofastq -i ${Sample}.chr13.bam -fq ${Sample}_chr13.fastq
+	python ${params.get_itd_path}/getitd.py -reference ${params.get_itd_path}/anno/amplicon.txt -anno ${params.get_itd_path}/anno/amplicon_kayser.tsv -forward_adapter AATGATACGGCGACCACCGAGATCTACACTCTTTCCCTACACGACGCTCTTCCGATCT -reverse_adapter CAAGCAGAAGACGGCATACGAGATCGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT -nkern 8 ${Sample} ${Sample}_chr13.fastq
+	"""
+}
+
 process pair_assembly_pear {
 	input:
 		tuple val (Sample), file(paired_forward), file(paired_reverse)
@@ -63,7 +81,7 @@ process unpaird_mapping_reads{
 }
 
 process sam_conversion{
-	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*.sorted.bam*'
+	//publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*.sorted.bam*'
 	input:
 		tuple val (Sample), file (samfile)
 	output:
@@ -237,8 +255,7 @@ process mutect2_run{
 	"""
 	${params.samtools} view -bs 40.1 ${finalBam} > subsampled_01.bam
 	${params.samtools} index subsampled_01.bam
-	${params.mutect2} ${params.java_path} ${params.GATK38_path} ${params.genome} subsampled_01.bam ${Sample}.mutect2.vcf ${params.site2} ${params.bedfile}.bed
-	
+	${params.mutect2} ${params.java_path} ${params.GATK38_path} ${params.genome} subsampled_01.bam ${Sample}.mutect2.vcf ${params.site2} ${params.bedfile}.bed	
 	"""
 }
 
@@ -251,7 +268,6 @@ process freebayes_run{
 	script:
 	"""
 	${params.freebayes_path} -f ${params.genome} -b ${finalBam} -t ${params.bedfile}.bed > ${Sample}.freebayes.vcf
-
 	"""
 }
 
@@ -263,8 +279,7 @@ process vardict_run {
 		tuple val (Sample), file ("*.vardict.vcf")
 	script:
 	"""
-	VarDict -G ${params.genome} -f 0.03 -N ${Sample} -b ${finalBam} -c 1 -S 2 -E 3 -g 4 ${params.bedfile}.bed | sed '1d' | teststrandbias.R | var2vcf_valid.pl -N ${Sample} -E -f 0.03 > ${Sample}.vardict.vcf
-	
+	VarDict -G ${params.genome} -f 0.03 -N ${Sample} -b ${finalBam} -c 1 -S 2 -E 3 -g 4 ${params.bedfile}.bed | sed '1d' | teststrandbias.R | var2vcf_valid.pl -N ${Sample} -E -f 0.03 > ${Sample}.vardict.vcf	
 	"""
 }
 
@@ -274,7 +289,6 @@ process varscan_run{
 	publishDir "$PWD/${Sample}/variants/", mode: 'copy', pattern: '*.varscan_snp.vcf.gz'
 	publishDir "$PWD/${Sample}/variants/", mode: 'copy', pattern: '*.varscan_indel.vcf.gz'
 	publishDir "$PWD/${Sample}/variants/", mode: 'copy', pattern: '*.varscan.vcf'
-
 	input:
 		tuple val (Sample), file(finalBam), file (finalBamBai), file (oldfinalBam), file (oldfinalBamBai)
 	output:
@@ -289,12 +303,11 @@ process varscan_run{
 	${params.bcftools_path} index -t ${Sample}.varscan_snp.vcf.gz
 	${params.bcftools_path} index -t ${Sample}.varscan_indel.vcf.gz
 	${params.bcftools_path} concat -a ${Sample}.varscan_snp.vcf.gz ${Sample}.varscan_indel.vcf.gz -o ${Sample}.varscan.vcf
-
 	"""
 }
 
 process lofreq_run{
-		publishDir "$PWD/${Sample}/variants/", mode: 'copy', pattern: '*.lofreq.filtered.vcf'
+	publishDir "$PWD/${Sample}/variants/", mode: 'copy', pattern: '*.lofreq.filtered.vcf'
 	input:
 		tuple val (Sample), file(finalBam), file (finalBamBai), file (oldfinalBam), file (oldfinalBamBai)
 	output:
@@ -305,7 +318,6 @@ process lofreq_run{
 	${params.samtools} sort ${Sample}.lofreq.pre.bam > ${Sample}.lofreq.bam
 	${params.lofreq_path} call -b dynamic -C 50 -a 0.00005 -q 30 -Q 30 -m 50 -f ${params.genome} -l ${params.bedfile}.bed -o ${Sample}.lofreq.vcf ${Sample}.lofreq.bam
 	${params.lofreq_path} filter -a 0.005 -i ${Sample}.lofreq.vcf -o ${Sample}.lofreq.filtered.vcf
-
 	"""
 }
 
@@ -327,7 +339,6 @@ process strelka_run{
 	${PWD}/${Sample}/variants/strelka-somatic/runWorkflow.py -m local -j 20
 	
 	${params.bcftools_path} concat -a ${PWD}/${Sample}/variants/strelka-somatic/results/variants/somatic.indels.vcf.gz ${PWD}/${Sample}/variants/strelka-somatic/results/variants/somatic.snvs.vcf.gz -o ${PWD}/${Sample}/variants/${Sample}.strelka-somatic.vcf
-
 	"""
 }
 
@@ -340,7 +351,6 @@ process platypus_run{
 	script:
 	"""
 	python2.7 ${params.platypus_path} callVariants --bamFiles=${finalBams[0]} --refFile=${params.genome} --output=${Sample}.platypus.vcf --nCPU=15 --minFlank=0 --filterDuplicates=0 --maxVariants=6 --minReads=6 --regions=${params.bedfile}_regions.txt
-
 	"""
 }
 
@@ -402,32 +412,33 @@ process mocha {
 	mv ${somaticseqVcf} ${Sample}.somaticseq_old.vcf
 	${params.bedtools} intersect -a ${Sample}.somaticseq_old.vcf -b ${params.mocha_bedfile} -header > ${Sample}.somaticseq.vcf
 	${params.mocha} ${Sample} ./
-
 	"""
 }
 process igv_reports{
 	input:
 		tuple val(Sample), file (somaticVcf), file (somaticseqMultianno)	
 	output:
-		tuple val(Sample)
+		val(Sample)
 	script:
 	"""
 	perl ${params.annovarLatest_path}/table_annovar.pl ${somaticVcf} --out ${Sample}.annovar --remove --protocol refGene,cytoBand,cosmic84,popfreq_all_20150413,avsnp150,intervar_20180118,1000g2015aug_all,clinvar_20170905 --operation g,r,f,f,f,f,f,f --buildver hg19 --nastring . --otherinfo --thread 10 ${params.annovarLatest_path}/humandb/ --xreffile ${params.annovarLatest_path}/example/gene_fullxref.txt -vcfinput
 
-	
 	${params.igv_script} ${params.genome} ${Sample}.annovar.hg19_multianno.vcf $PWD/Final_Output/${Sample}/${Sample}.final.bam $PWD/Final_Output/${Sample}/${Sample}_igv.html
 	sleep 1s
 	"""
 }
 
 process cnvkit_run {
-	publishDir "$PWD/${Sample}/cnvkit/", mode: 'copy'
+	publishDir "$PWD/${Sample}/cnvkit/", mode: 'copy', pattern: '*.cn*'
 	input:
 		tuple val (Sample), file(finalBam), file(finalBamBai), file (oldfinalBam), file (oldfinalBamBai)
 	output:
 		val Sample
 	script:
 	"""
+	if [ ! -d ${PWD}/${Sample}/cnvkit ];then
+		mkdir -p ${PWD}/${Sample}/cnvkit
+	fi
 	${params.cnvkit_path} ${finalBam} ${params.cnvkitRef} ${PWD}/${Sample}/cnvkit/
 	/${params.gene_scatter}/custom_scatter_v3.py ${params.gene_scatter}/chr_list_all.txt ${PWD}/${Sample}/cnvkit/${Sample}.final.cnr ${PWD}/${Sample}/cnvkit/${Sample}.final.cns ${Sample}
 	/${params.gene_scatter}/custom_scatter_chrwise.py ${params.gene_scatter}/chrwise_list.txt ${PWD}/${Sample}/cnvkit/${Sample}.final.cnr ${PWD}/${Sample}/cnvkit/${Sample}.final.cns ${Sample}_chr_
@@ -442,7 +453,7 @@ process ifcnv_run {
 	input:
 		val Sample
 	output:
-		tuple val (Sample)
+		val (Sample)
 	script:
 	"""
 	${params.links} $PWD/Final_Output/ ${params.input}
@@ -596,7 +607,7 @@ process format_somaticseq_combined {
 
 process format_concat_combine_somaticseq {
 	input:
-		tuple val (Sample), file ("*")
+		val (Sample)
 	output:
 		val Sample
 	script:
@@ -610,7 +621,6 @@ process format_concat_combine_somaticseq {
 	sed -i '1iChr,Start,End,Ref,Alt,Variant_Callers,FILTER,SOMATIC_FLAG,VariantCaller_Count,REF_COUNT,ALT_COUNT,VAF,Func.refGene,Gene.refGene,ExonicFunc.refGene,AAChange.refGene,Gene_full_name.refGene,Function_description.refGene,Disease_description.refGene,cosmic84,PopFreqMax,1000G_ALL,ExAC_ALL,CG46,ESP6500siv2_ALL,InterVar_automated' ${PWD}/${Sample}/Annovar_Modified/${Sample}.final.concat.csv
 	
 	sed -i '1iChr,Start,End,Ref,Alt,Variant_Callers,FILTER,SOMATIC_FLAG,VariantCaller_Count,REF_COUNT,ALT_COUNT,VAF,Func.refGene,Gene.refGene,ExonicFunc.refGene,AAChange.refGene,Gene_full_name.refGene,Function_description.refGene,Disease_description.refGene,cosmic84,PopFreqMax,1000G_ALL,ExAC_ALL,CG46,ESP6500siv2_ALL,InterVar_automated' ${PWD}/${Sample}/Annovar_Modified/${Sample}.artefacts.csv
-
 	"""
 }
 
@@ -650,7 +660,6 @@ process merge_csv {
 	
 	## for adding CNV_coverview_region and myeloid_coverview_region sheet in final xlsx  
 	python3 ${params.myeloid_cnv} ${PWD}/Final_Output/${Sample}/${Sample}.coverview_regions.csv /home/pipelines/MMpanel/scripts/cnvkit_cnvmyeloid/CNV_3072_hg19_RegionNames.txt ${PWD}/Final_Output/${Sample}/${Sample}.xlsx
-
 	"""
 }
 process Final_Output {
@@ -666,7 +675,7 @@ process Final_Output {
 }
 process remove_files{
 	input:
-		tuple val (Sample),file (InsertSizeMetrics),file (InsertSizeMetricsPdf), file (hsmetrics), file (coverageBed), file (pindelcoveragebed), file (coverview)
+		tuple val (Sample),file (output_excel), file (coverage_png)
 	script:
 	"""
 	rm -rf ${PWD}/${Sample}/
@@ -685,35 +694,36 @@ workflow VALIDATION {
 	main:
 	trimming_trimmomatic(samples_ch) | pair_assembly_pear | mapping_reads | sam_conversion
 	unpaird_mapping_reads(trimming_trimmomatic.out) | sam_conver_unpaired
+	minimap_getitd(samples_ch)
 	RealignerTargetCreator(sam_conversion.out)
 	IndelRealigner(RealignerTargetCreator.out.join(sam_conversion.out)) | BaseRecalibrator
 	PrintReads(IndelRealigner.out.join(BaseRecalibrator.out)) | generatefinalbam
 	hsmetrics_run(generatefinalbam.out)
-	//InsertSizeMetrics(sam_conver_unpaired.out)
-	//coverage(generatefinalbam.out)
-	//coverview_run(generatefinalbam.out)
-	//coverview_report(coverview_run.out)
-	//platypus_run(generatefinalbam.out)
-	//freebayes_run(generatefinalbam.out)
-	//mutect2_run(generatefinalbam.out)
-	//vardict_run(generatefinalbam.out)
-	//varscan_run(generatefinalbam.out)
-	//lofreq_run(generatefinalbam.out)
-	//strelka_run(generatefinalbam.out)
-	//cnvkit_run(generatefinalbam.out)
-	//pindel(generatefinalbam.out)
-	//format_pindel(pindel.out.join(coverage.out))
-	//somaticSeq_run(freebayes_run.out.join(platypus_run.out.join(mutect2_run.out.join(vardict_run.out.join(varscan_run.out.join(lofreq_run.out.join(strelka_run.out.join(generatefinalbam.out))))))))
-	//igv_reports(somaticSeq_run.out)
-	//ifcnv_run(generatefinalbam.out.collect())
-	//mocha(somaticSeq_run.out)
-	//combine_variants(freebayes_run.out.join(platypus_run.out))
-	//cava(somaticSeq_run.out)
-	//format_somaticseq_combined(somaticSeq_run.out.join(combine_variants.out))
-	//format_concat_combine_somaticseq(format_somaticseq_combined.out)	
-	//merge_csv(format_concat_combine_somaticseq.out.join(cava.out.join(format_pindel.out.join(cnvkit_run.out))))
-	//Final_Output(coverage.out)
-	//remove_files(InsertSizeMetrics.out.join(hsmetrics_run.out.join(coverage.out.join(coverview_run.out))))
+	InsertSizeMetrics(sam_conver_unpaired.out)
+	coverage(generatefinalbam.out)
+	coverview_run(generatefinalbam.out)
+	coverview_report(coverview_run.out)
+	platypus_run(generatefinalbam.out)
+	freebayes_run(generatefinalbam.out)
+	mutect2_run(generatefinalbam.out)
+	vardict_run(generatefinalbam.out)
+	varscan_run(generatefinalbam.out)
+	lofreq_run(generatefinalbam.out)
+	strelka_run(generatefinalbam.out)
+	cnvkit_run(generatefinalbam.out)
+	pindel(generatefinalbam.out)
+	format_pindel(pindel.out.join(coverage.out))
+	somaticSeq_run(freebayes_run.out.join(platypus_run.out.join(mutect2_run.out.join(vardict_run.out.join(varscan_run.out.join(lofreq_run.out.join(strelka_run.out.join(generatefinalbam.out))))))))
+	igv_reports(somaticSeq_run.out)
+	ifcnv_run(generatefinalbam.out.collect())
+	mocha(somaticSeq_run.out)
+	combine_variants(freebayes_run.out.join(platypus_run.out))
+	cava(somaticSeq_run.out)
+	format_somaticseq_combined(somaticSeq_run.out.join(combine_variants.out))
+	format_concat_combine_somaticseq(format_somaticseq_combined.out)	
+	merge_csv(format_concat_combine_somaticseq.out.join(cava.out.join(format_pindel.out.join(cnvkit_run.out))))
+	Final_Output(coverage.out.join(cnvkit_run.out))
+	remove_files(merge_csv.out.join(Final_Output.out))
 }
 
 workflow IfCnv {
