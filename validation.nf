@@ -79,7 +79,7 @@ process unpaird_mapping_reads{
 }
 
 process sam_conversion{
-	//publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*.sorted.bam*'
+	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*.sorted.bam*'
 	input:
 		tuple val (Sample), file (samfile)
 	output:
@@ -113,7 +113,7 @@ process RealignerTargetCreator {
 		tuple val (Sample), file ("*.intervals")
 	script:
 	"""
-	${params.java_path}/java -Xmx8G -jar ${params.GATK38_path} -T RealignerTargetCreator -R ${params.genome} -nt 10 -I ${bamFile} --known ${params.site1} -o ${Sample}.intervals
+	${params.java_path}/java -jar ${params.GATK38_path} -T RealignerTargetCreator -R ${params.genome} -nt 10 -I ${bamFile} --known ${params.site1} -o ${Sample}.intervals
 	"""
 }
 
@@ -125,7 +125,7 @@ process IndelRealigner{
 	script:
 	"""
 	echo ${Sample} ${targetIntervals} ${bamFile}
-	${params.java_path}/java -Xmx8G -jar ${params.GATK38_path} -T IndelRealigner -R ${params.genome} -I ${bamFile} -known ${params.site1} --targetIntervals ${targetIntervals} -o ${Sample}.realigned.bam
+	${params.java_path}/java -jar ${params.GATK38_path} -T IndelRealigner -R ${params.genome} -I ${bamFile} -known ${params.site1} --targetIntervals ${targetIntervals} -o ${Sample}.realigned.bam
 	"""
 }
 
@@ -136,7 +136,7 @@ process BaseRecalibrator{
 		tuple val(Sample), file ("*.recal_data.table")
 	script:
 	"""
-	${params.java_path}/java -Xmx8G -jar ${params.GATK38_path} -T BaseRecalibrator -R ${params.genome} -I ${realignedBam} -knownSites ${params.site2} -knownSites ${params.site3} -maxCycle 600 -o ${Sample}.recal_data.table
+	${params.java_path}/java -jar ${params.GATK38_path} -T BaseRecalibrator -R ${params.genome} -I ${realignedBam} -knownSites ${params.site2} -knownSites ${params.site3} -maxCycle 600 -o ${Sample}.recal_data.table
 	"""
 }
 
@@ -147,7 +147,7 @@ process PrintReads{
 		tuple val (Sample), file ("*.aligned.recalibrated.bam")
 	script:
 	"""
-	${params.java_path}/java -Xmx8G -jar ${params.GATK38_path} -T PrintReads -R ${params.genome} -I ${realignedBam} --BQSR ${recal_dataTable} -o ${Sample}.aligned.recalibrated.bam
+	${params.java_path}/java -jar ${params.GATK38_path} -T PrintReads -R ${params.genome} -I ${realignedBam} --BQSR ${recal_dataTable} -o ${Sample}.aligned.recalibrated.bam
 	"""
 }
 
@@ -436,10 +436,11 @@ process cnvkit_run {
 		mkdir -p ${PWD}/${Sample}/cnvkit
 	fi
 	${params.cnvkit_path} ${finalBam} ${params.cnvkitRef} ${PWD}/${Sample}/cnvkit/
-	/${params.gene_scatter}/custom_scatter_v3.py ${params.gene_scatter}/chr_list_all.txt ${PWD}/${Sample}/cnvkit/${Sample}.final.cnr ${PWD}/${Sample}/cnvkit/${Sample}.final.cns ${Sample}
-	/${params.gene_scatter}/custom_scatter_chrwise.py ${params.gene_scatter}/chrwise_list.txt ${PWD}/${Sample}/cnvkit/${Sample}.final.cnr ${PWD}/${Sample}/cnvkit/${Sample}.final.cns ${Sample}_chr_
+	#/${params.gene_scatter}/custom_scatter_v3.py ${params.gene_scatter}/chr_list_all.txt ${PWD}/${Sample}/cnvkit/${Sample}.final.cnr ${PWD}/${Sample}/cnvkit/${Sample}.final.cns ${Sample}
+	/${params.gene_scatter}/custom_scatter_chrwise.py ${params.gene_scatter_list}/chrwise_list.txt ${PWD}/${Sample}/cnvkit/${Sample}.final.cnr ${PWD}/${Sample}/cnvkit/${Sample}.final.cns ${Sample}_chr_
 	cp *gene_scatter.pdf $PWD/${Sample}/cnvkit/
 	cp *gene_scatter.pdf $PWD/Final_Output/${Sample}/
+	cp ${PWD}/${Sample}/cnvkit/${Sample}.final-scatter.png ${PWD}/${Sample}/cnvkit/${Sample}.final-diagram.pdf ${PWD}/Final_Output/${Sample}/	
 	"""
 }
 
@@ -528,6 +529,26 @@ process ifcnv {
 			cp ifCNV_genewise/\${i}.*.html $PWD/Final_Output/\${i}/ifCNV_genewise/
 		done
 	fi
+	"""
+}
+
+process update_db {
+	publishDir "$PWD/work/", mode: 'copy', pattern: 'freq.txt'
+	input:
+		val Sample
+	output:
+		file ("freq.txt")
+	script:
+	"""
+	for i in `cat ${params.input}`
+	do 
+		if [ -f ${PWD}/Final_Output/\${i}/\${i}.somaticseq.vcf ]; then
+			ln -s ${PWD}/Final_Output/\${i}/\${i}.somaticseq.vcf ./
+		fi
+	done
+	files=\$(ls *.somaticseq.vcf)
+	${params.updatedb} ${params.icmrdb} \${files}
+	${params.freq_py} ${params.icmrdb} freq.txt
 	"""
 }
 
@@ -620,7 +641,7 @@ process format_concat_combine_somaticseq {
 }
 
 process format_pindel {
-	errorStrategy 'ignore'
+	//errorStrategy 'ignore'
 	publishDir "$PWD/${Sample}/pindel/", mode: 'copy', pattern: '*_final.pindel.csv'
 	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*_final.pindel.csv'
 	input:
@@ -630,6 +651,7 @@ process format_pindel {
 	script:
 	"""
 	python3 ${params.format_pindel_script} ${PWD}/${Sample}/coverage/${Sample}_pindel.counts.bed ${PWD}/${Sample}/pindel/${Sample}_pindel.hg19_multianno.csv ${PWD}/${Sample}/pindel/${Sample}_final.pindel.csv
+
 	"""
 }
 
@@ -641,7 +663,11 @@ process merge_csv {
 	script:
 	"""
 	sed -i 's/\t/,/g' ${PWD}/${Sample}/cnvkit/${Sample}.final.cnr
-	python3 ${params.pharma_marker_script} ${Sample} ${PWD}/${Sample}/Annovar_Modified/ ${params.pharma_input_xlxs} ${PWD}/${Sample}/${Sample}_pharma.csv
+	if [ -f ${PWD}/${Sample}/Annovar_Modified/${Sample}.final.concat.csv ]; then
+		python3 ${params.pharma_marker_script} ${Sample} ${PWD}/${Sample}/Annovar_Modified/ ${params.pharma_input_xlxs} ${PWD}/${Sample}/${Sample}_pharma.csv
+	else
+		touch ${PWD}/${Sample}/${Sample}_pharma.csv
+	fi
 	python3 ${params.merge_csvs_script} ${Sample} ${PWD}/${Sample}/Annovar_Modified/ ${PWD}/Final_Output/${Sample}/${Sample}.xlsx ${PWD}/${Sample}/CAVA/ ${PWD}/${Sample}/Coverview/${Sample}.coverview_regions.csv ${PWD}/${Sample}/pindel/${Sample}_final.pindel.csv ${PWD}/${Sample}/cnvkit/${Sample}.final.cnr ${PWD}/${Sample}/${Sample}_pharma.csv
 
 	cp ${PWD}/${Sample}/Annovar_Modified/${Sample}.final.concat.csv ${Sample}.final.concat_append.csv
@@ -656,6 +682,24 @@ process merge_csv {
 	python3 ${params.myeloid_cnv} ${PWD}/Final_Output/${Sample}/${Sample}.coverview_regions.csv /home/pipelines/MMpanel/scripts/cnvkit_cnvmyeloid/CNV_3072_hg19_RegionNames.txt ${PWD}/Final_Output/${Sample}/${Sample}.xlsx
 	"""
 }
+
+process update_freq {
+	input:
+		val (Sample)
+	output:
+		val (Sample)
+	script:
+	"""
+	ln -s ${PWD}/work/freq.txt ./
+	for i in `cat ${params.input}`
+	do
+		if [ -f ${PWD}/Final_Output/\${i}/\${i}.xlsx ]; then
+			${params.update_freq_excel} ${PWD}/Final_Output/\${i}/\${i}.xlsx freq.txt
+		fi
+	done
+	"""
+}
+
 process Final_Output {
 	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*.png'
 	input:
@@ -687,37 +731,39 @@ workflow VALIDATION {
 	
 	main:
 	trimming_trimmomatic(samples_ch) | pair_assembly_pear | mapping_reads | sam_conversion
-	unpaird_mapping_reads(trimming_trimmomatic.out) | sam_conver_unpaired
-	minimap_getitd(samples_ch)
+	//unpaird_mapping_reads(trimming_trimmomatic.out) | sam_conver_unpaired
+	//minimap_getitd(samples_ch)
 	RealignerTargetCreator(sam_conversion.out)
 	IndelRealigner(RealignerTargetCreator.out.join(sam_conversion.out)) | BaseRecalibrator
 	PrintReads(IndelRealigner.out.join(BaseRecalibrator.out)) | generatefinalbam
 	hsmetrics_run(generatefinalbam.out)
-	InsertSizeMetrics(sam_conver_unpaired.out)
-	coverage(generatefinalbam.out)
+	//InsertSizeMetrics(sam_conver_unpaired.out)
+	//coverage(generatefinalbam.out)
 	coverview_run(generatefinalbam.out)
-	coverview_report(coverview_run.out)
-	platypus_run(generatefinalbam.out)
-	freebayes_run(generatefinalbam.out)
-	mutect2_run(generatefinalbam.out)
-	vardict_run(generatefinalbam.out)
-	varscan_run(generatefinalbam.out)
-	lofreq_run(generatefinalbam.out)
-	strelka_run(generatefinalbam.out)
-	cnvkit_run(generatefinalbam.out)
-	pindel(generatefinalbam.out)
-	format_pindel(pindel.out.join(coverage.out))
-	somaticSeq_run(freebayes_run.out.join(platypus_run.out.join(mutect2_run.out.join(vardict_run.out.join(varscan_run.out.join(lofreq_run.out.join(strelka_run.out.join(generatefinalbam.out))))))))
-	igv_reports(somaticSeq_run.out)
-	ifcnv_run(generatefinalbam.out.collect())
-	mocha(somaticSeq_run.out)
-	combine_variants(freebayes_run.out.join(platypus_run.out))
-	cava(somaticSeq_run.out)
-	format_somaticseq_combined(somaticSeq_run.out.join(combine_variants.out))
-	format_concat_combine_somaticseq(format_somaticseq_combined.out)	
-	merge_csv(format_concat_combine_somaticseq.out.join(cava.out.join(format_pindel.out.join(cnvkit_run.out))))
-	Final_Output(coverage.out.join(cnvkit_run.out))
-	remove_files(merge_csv.out.join(Final_Output.out))
+	//coverview_report(coverview_run.out)
+	//platypus_run(generatefinalbam.out)
+	//freebayes_run(generatefinalbam.out)
+	//mutect2_run(generatefinalbam.out)
+	//vardict_run(generatefinalbam.out)
+	//varscan_run(generatefinalbam.out)
+	//lofreq_run(generatefinalbam.out)
+	//strelka_run(generatefinalbam.out)
+	//cnvkit_run(generatefinalbam.out)
+	//pindel(generatefinalbam.out)
+	//format_pindel(pindel.out.join(coverage.out))
+	//somaticSeq_run(freebayes_run.out.join(platypus_run.out.join(mutect2_run.out.join(vardict_run.out.join(varscan_run.out.join(lofreq_run.out.join(strelka_run.out.join(generatefinalbam.out))))))))
+	//igv_reports(somaticSeq_run.out)
+	//ifcnv_run(generatefinalbam.out.collect())
+	//update_db(somaticSeq_run.out.collect())
+	//mocha(somaticSeq_run.out)
+	//combine_variants(freebayes_run.out.join(platypus_run.out))
+	//cava(somaticSeq_run.out)
+	//format_somaticseq_combined(somaticSeq_run.out.join(combine_variants.out))
+	//format_concat_combine_somaticseq(format_somaticseq_combined.out)	
+	//merge_csv(format_concat_combine_somaticseq.out.join(cava.out.join(format_pindel.out.join(cnvkit_run.out))))
+	//update_freq(merge_csv.out.collect())
+	//Final_Output(coverage.out.join(cnvkit_run.out))
+	//remove_files(merge_csv.out.join(Final_Output.out))
 }
 
 workflow IfCnv {

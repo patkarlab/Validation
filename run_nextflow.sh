@@ -26,7 +26,8 @@ echo "WARNING : change the bedfile and the cnv reference"
 #source activate new_base
 #nextflow -c /home/diagnostics/pipelines/Validation/nextflow.config run validation.nf -entry  VALIDATION \
 #--bedfile /home/pipelines/mutation_detector_nextflow/bedfile/CNV_Small_TALL_RNA_DNA_IGVH_sortd \
-#--cnvkitRef /home/pipelines/NextSeq_mutation_detector_leukemia/scripts/cnvkit_combpanel/Reference_combpanel.cnn \
+#--cnvkitRef /home/pipelines/MMpanel/scripts/cnvkit_cnvmyeloid/Reference_combpanel.cnn \
+#--gene_scatter_list /home/pipelines/MMpanel/scripts/cnvkit_cnvmyeloid \
 #--sequences /home/diagnostics/pipelines/Validation/sequences/ \
 #--input /home/diagnostics/pipelines/Validation/samplesheet.csv \
 #-resume -bg
@@ -34,14 +35,14 @@ echo "WARNING : change the bedfile and the cnv reference"
 #change bedfile name,without .bed extension
 
 # For CNV myeloid panel
-source activate new_base
-nextflow -c  /home/diagnostics/pipelines/Validation/nextflow.config run validation.nf -entry VALIDATION \
---bedfile /home/pipelines/mutation_detector_nextflow/bedfile/CNV_Small_hg19_newmyeloid_sortd \
---cnvkitRef /home/pipelines/MMpanel/scripts/cnvkit_cnvmyeloid/Reference_combpanel.cnn \
---gene_scatter_list /home/pipelines/MMpanel/scripts/cnvkit_cnvmyeloid \
---sequences /home/diagnostics/pipelines/Validation/sequences/ \
---input /home/diagnostics/pipelines/Validation/samplesheet.csv \
--resume -bg
+#source activate new_base
+#nextflow -c  /home/diagnostics/pipelines/Validation/nextflow.config run validation.nf -entry VALIDATION \
+#--bedfile /home/pipelines/mutation_detector_nextflow/bedfile/CNV_Small_hg19_newmyeloid_sortd \
+#--cnvkitRef /home/pipelines/MMpanel/scripts/cnvkit_cnvmyeloid/Reference_combpanel.cnn \
+#--gene_scatter_list /home/pipelines/MMpanel/scripts/cnvkit_cnvmyeloid \
+#--sequences /home/diagnostics/pipelines/Validation/sequences/ \
+#--input /home/diagnostics/pipelines/Validation/samplesheet.csv \
+#-resume -bg
 #conda deactivate
 
 #source activate new_base
@@ -53,3 +54,23 @@ nextflow -c  /home/diagnostics/pipelines/Validation/nextflow.config run validati
 #--input /home/diagnostics/pipelines/Validation/samplesheet.csv \
 #-resume -bg
 #conda deactivate
+
+# For CNV Small panel
+#source activate new_base
+#nextflow -c  /home/diagnostics/pipelines/Validation/nextflow.config run validation.nf -entry VALIDATION \
+#--bedfile /home/pipelines/MMpanel/bedfiles/CNV_Small_hg19_sortd \
+#--cnvkitRef /home/pipelines/NextSeq_mutation_detector_leukemia/scripts/cnvkit_mmpanel/Reference_combpanel.cnn \
+#--gene_scatter_list /home/pipelines/MMpanel/scripts/cnvkit_mmpanel \
+#--sequences /home/diagnostics/pipelines/Validation/sequences/ \
+#--input /home/diagnostics/pipelines/Validation/samplesheet.csv \
+#-resume -bg
+#conda deactivate
+
+# NPM1-FLT3 amplicon MRD
+source activate new_base
+nextflow -c /home/diagnostics/pipelines/Validation/nextflow.config run npm1_mrd.nf -entry NPM1 \
+--sequences /home/diagnostics/pipelines/Validation/sequences/ \
+--input /home/diagnostics/pipelines/Validation/samplesheet.csv \
+--bedfile /home/diagnostics/pipelines/Validation/bedfiles/NPM1_FLT3 \
+-resume -bg
+conda deactivate
