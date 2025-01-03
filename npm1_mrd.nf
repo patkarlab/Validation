@@ -57,6 +57,23 @@ process pair_assembly_pear {
 	"""
 }
 
+process filt3r {
+	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*filt3r*'
+	input:
+		tuple val (Sample), file(paired_forward), file(paired_reverse)
+	output:
+		tuple val (Sample), file("*_filt3r.vcf"), file("*_filt3r_json.xlsx"), file("*_filt3r_final.csv")
+	script:
+	"""
+	filt3r -k 12 --ref ${params.filt3r_ref} --sequences ${paired_forward},${paired_reverse} --nb-threads 64 --vcf --out ${Sample}_filt3r.json
+	python3 ${PWD}/scripts/convert_json_to_xl.py ${Sample}_filt3r.json ${Sample}_filt3r_json.xlsx
+	perl ${params.annovarLatest_path}/convert2annovar.pl -format vcf4 ${Sample}_filt3r.vcf  --outfile ${Sample}.filt3r.avinput --withzyg --includeinfo
+	perl ${params.annovarLatest_path}/table_annovar.pl ${Sample}.filt3r.avinput --out ${Sample}.filt3r --remove --protocol refGene,cytoBand,cosmic84,popfreq_all_20150413,avsnp150,intervar_20180118,1000g2015aug_all,clinvar_20170905 --operation g,r,f,f,f,f,f,f --buildver hg19 --nastring '-1' --otherinfo --csvout --thread 10 ${params.annovarLatest_path}/humandb/ --xreffile ${params.annovarLatest_path}/example/gene_fullxref.txt
+
+	python3 ${PWD}/scripts/somaticseqoutput-format_filt3r.py ${Sample}.filt3r.hg19_multianno.csv  ${Sample}_filt3r_final.csv
+	"""
+}
+
 process mapping_reads {
 	input:
 		tuple val (Sample), file (pairAssembled)
@@ -138,6 +155,19 @@ process Annovar {
 	"""
 }
 
+process CombineCallers {
+	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy'
+	input:
+		tuple val (Sample), file (varscan_multianno), file(varscan_csv), file(filt3r_vcf), file(filt3r_json), file(filt3r_final_csv)
+	output:
+		tuple val(Sample), file("${Sample}.xlsx")
+	script:
+	"""
+	${params.merge_tsvs_script} ${Sample}.xlsx ${varscan_csv} ${filt3r_final_csv}
+	
+	"""
+}
+
 workflow NPM1 {
 	Channel
 		.fromPath(params.input)
@@ -149,10 +179,12 @@ workflow NPM1 {
 	main:
 	//trimming(samples_ch) | pair_assembly_pear | mapping_reads | sam_conversion
 	trimming(samples_ch) | map_paired_reads | sam_conversion
+	filt3r(trimming.out)
 	minimap_getitd(samples_ch)
 	coverage(sam_conversion.out)
 	varscan(sam_conversion.out)
 	Annovar(varscan.out)
+	CombineCallers(Annovar.out.join(filt3r.out))
 }
 
 workflow.onComplete {
