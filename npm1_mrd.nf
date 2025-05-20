@@ -58,21 +58,35 @@ process pair_assembly_pear {
 }
 
 process filt3r {
-	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*filt3r*'
+	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*filt3r_json.csv'
+
 	input:
 		tuple val (Sample), file(paired_forward), file(paired_reverse)
+
 	output:
-		tuple val (Sample), file("*_filt3r.vcf"), file("*_filt3r_json.xlsx"), file("*_filt3r_final.csv")
+		tuple val (Sample), file("*_filt3r.vcf"), file("*_filt3r_json.csv"), file("*_filt3r_out.csv")
+
 	script:
 	"""
 	filt3r -k 12 --ref ${params.filt3r_ref} --sequences ${paired_forward},${paired_reverse} --nb-threads 64 --vcf --out ${Sample}_filt3r.json
-	python3 ${PWD}/scripts/convert_json_to_xl.py ${Sample}_filt3r.json ${Sample}_filt3r_json.xlsx
-	perl ${params.annovarLatest_path}/convert2annovar.pl -format vcf4 ${Sample}_filt3r.vcf  --outfile ${Sample}.filt3r.avinput --withzyg --includeinfo
+	python3 ${PWD}/scripts/convert_json_to_csv.py ${Sample}_filt3r.json ${Sample}_filt3r_json.csv
+	perl ${params.annovarLatest_path}/convert2annovar.pl -format vcf4 ${Sample}_filt3r.vcf --outfile ${Sample}.filt3r.avinput --withzyg --includeinfo
 	perl ${params.annovarLatest_path}/table_annovar.pl ${Sample}.filt3r.avinput --out ${Sample}.filt3r --remove --protocol refGene,cytoBand,cosmic84,popfreq_all_20150413,avsnp150,intervar_20180118,1000g2015aug_all,clinvar_20170905 --operation g,r,f,f,f,f,f,f --buildver hg19 --nastring '-1' --otherinfo --csvout --thread 10 ${params.annovarLatest_path}/humandb/ --xreffile ${params.annovarLatest_path}/example/gene_fullxref.txt
 
-	python3 ${PWD}/scripts/somaticseqoutput-format_filt3r.py ${Sample}.filt3r.hg19_multianno.csv  ${Sample}_filt3r_final.csv
+	# Check if the multianno file is empty
+	if [[ ! -s ${Sample}.filt3r.hg19_multianno.csv ]]; then
+		touch ${Sample}.filt3r__final.csv
+		touch ${Sample}_filt3r_json_filtered.csv
+		touch ${Sample}_filt3r_out.csv
+	else
+		python3 ${PWD}/scripts/somaticseqoutput-format_filt3r.py ${Sample}.filt3r.hg19_multianno.csv ${Sample}.filt3r__final.csv
+		python3 ${PWD}/scripts/filter_json.py ${Sample}_filt3r_json.csv ${Sample}_filt3r_json_filtered.csv
+		python3 ${PWD}/scripts/merge_filt3r_csvs.py ${Sample}.filt3r__final.csv ${Sample}_filt3r_json_filtered.csv ${Sample}_filt3r_out.csv
+	fi
 	"""
 }
+
+
 
 process mapping_reads {
 	input:
@@ -157,13 +171,14 @@ process Annovar {
 
 process CombineCallers {
 	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy'
+
 	input:
-		tuple val (Sample), file (varscan_multianno), file(varscan_csv), file(filt3r_vcf), file(filt3r_json), file(filt3r_final_csv)
+		tuple val (Sample), file (varscan_multianno), file(varscan_csv), file(filt3r_vcf), file(filt3r_json), file(filt3r_out_csv)
 	output:
 		tuple val(Sample), file("${Sample}.xlsx")
 	script:
 	"""
-	${params.merge_tsvs_script} ${Sample}.xlsx ${varscan_csv} ${filt3r_final_csv}
+	${params.merge_tsvs_script} ${Sample}.xlsx ${varscan_csv} ${filt3r_out_csv}
 	
 	"""
 }

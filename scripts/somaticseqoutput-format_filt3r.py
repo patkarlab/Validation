@@ -25,7 +25,7 @@ for row in x:
     
     data['REF_COUNT'].append(info[2].split('=')[1])
     data['ALT_COUNT'].append(info[1].split('=')[1])
-    data['VAF%'].append(float(info[3].split('=')[1]))  # Convert to float for multiplication
+    data['VAF%'].append(float(info[4].split('=')[1]))  # Convert to float for multiplication
 
 # Multiply VAF% by 100
 data['VAF%'] = [value * 100 for value in data['VAF%']]
