@@ -9,6 +9,7 @@ BED file: ${params.bedfile}.bed
 Sequences in:${params.sequences}
 """
 
+
 process minimap_getitd {
 	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*_getitd'
 	input:
@@ -27,6 +28,52 @@ process minimap_getitd {
 	"""
 }
 
+process minimap_getitd_aviti {
+	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*_getitd'
+	input:
+			val Sample
+	output:
+			path "*_getitd"
+	script:
+	"""
+	minimap2 -ax sr ${params.genome_minimap_getitd} ${params.sequences}/${Sample}_*R1.fastq.gz ${params.sequences}/${Sample}_*R2.fastq.gz > ${Sample}.sam
+	${params.samtools} view -b -h ${Sample}.sam -o ${Sample}.bam
+	${params.samtools} sort ${Sample}.bam -o ${Sample}.sorted.bam
+	${params.samtools} index ${Sample}.sorted.bam
+	${params.samtools} view ${Sample}.sorted.bam -b -h chr13 > ${Sample}.chr13.bam
+	${params.bedtools} bamtofastq -i ${Sample}.chr13.bam -fq ${Sample}_chr13.fastq
+	python ${params.get_itd_path}/getitd.py -reference ${params.get_itd_path}/anno/amplicon.txt -anno ${params.get_itd_path}/anno/amplicon_kayser.tsv -forward_adapter AATGATACGGCGACCACCGAGATCTACACTCTTTCCCTACACGACGCTCTTCCGATCT -reverse_adapter CAAGCAGAAGACGGCATACGAGATCGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT -nkern 8 ${Sample} ${Sample}_chr13.fastq
+	"""
+}
+
+process getitd {
+	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*_getitd'
+	input:
+			tuple val (Sample), file(finalBams), file(finalBamBai)
+	output:
+			path "*_getitd"
+	script:
+	"""
+	${params.samtools} view ${finalBams} -b -h chr13 > ${Sample}.chr13.bam
+	${params.bedtools} bamtofastq -i ${Sample}.chr13.bam -fq ${Sample}_chr13.fastq
+	python ${params.get_itd_path}/getitd.py -reference ${params.get_itd_path}/anno/amplicon.txt -anno ${params.get_itd_path}/anno/amplicon_kayser.tsv -forward_adapter AATGATACGGCGACCACCGAGATCTACACTCTTTCCCTACACGACGCTCTTCCGATCT -reverse_adapter CAAGCAGAAGACGGCATACGAGATCGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT -nkern 8 ${Sample} ${Sample}_chr13.fastq
+	"""
+}
+
+process getitd_aviti {
+	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*_getitd'
+	input:
+			tuple val (Sample), file(finalBams), file(finalBamBai)
+	output:
+			path "*_getitd"
+	script:
+	"""
+	${params.samtools} view ${finalBams} -b -h chr13 > ${Sample}.chr13.bam
+	${params.bedtools} bamtofastq -i ${Sample}.chr13.bam -fq ${Sample}_chr13.fastq
+	python ${params.get_itd_path}/getitd.py -reference ${params.get_itd_path}/anno/amplicon.txt -anno ${params.get_itd_path}/anno/amplicon_kayser.tsv -forward_adapter AATGATACGGCGACCACCGAGATCTACACTCTTTCCCTACACGACGCTCTTCCGATCT -reverse_adapter CAAGCAGAAGACGGCATACGAGATCGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT -nkern 8 ${Sample} ${Sample}_chr13.fastq
+	"""
+}
+
 process trimming { 
 	input:
 		val (Sample)
@@ -38,6 +85,24 @@ process trimming {
 	#/home/programs/ea-utils/clipper/fastq-mcf -o ${Sample}.R1.trimmed.fastq -o ${Sample}.R2.trimmed.fastq -l 53 -k 0 -q 0 /home/diagnostics/pipelines/smMIPS_pipeline/code/functions/preprocess_reads_miseq/smmip_adaptors.fa ${params.sequences}/${Sample}_S*_R1_*.fastq.gz  ${params.sequences}/${Sample}_S*_R2_*.fastq.gz
 	trimmomatic PE \
 	${params.sequences}/${Sample}_*R1_*.fastq.gz ${params.sequences}/${Sample}_*R2_*.fastq.gz \
+	-baseout ${Sample}.fq.gz \
+	ILLUMINACLIP:${params.adaptors}:2:30:10:2:keepBothReads \
+	ILLUMINACLIP:${params.nextera_adapters}:2:30:10:2:keepBothReads \
+	LEADING:3 SLIDINGWINDOW:4:15 MINLEN:40	
+	sleep 5s
+	"""
+}
+
+process trimming_aviti { 
+	input:
+		val (Sample)
+	output:
+		//tuple val (Sample), file("${Sample}.R1.trimmed.fastq"), file("${Sample}.R2.trimmed.fastq")
+		tuple val (Sample), file("*1P.fq.gz"), file("*2P.fq.gz")
+	script:
+	"""	
+	trimmomatic PE \
+	${params.sequences}/${Sample}_*R1.fastq.gz ${params.sequences}/${Sample}_*R2.fastq.gz \
 	-baseout ${Sample}.fq.gz \
 	ILLUMINACLIP:${params.adaptors}:2:30:10:2:keepBothReads \
 	ILLUMINACLIP:${params.nextera_adapters}:2:30:10:2:keepBothReads \
@@ -163,7 +228,11 @@ process Annovar {
 	perl ${params.annovarLatest_path}/convert2annovar.pl -format vcf4 ${varscanVcf}  --outfile ${Sample}.varscan.avinput --withzyg --includeinfo
 	perl ${params.annovarLatest_path}/table_annovar.pl ${Sample}.varscan.avinput --out ${Sample}.varscan --remove --protocol refGene,cytoBand,cosmic84,popfreq_all_20150413,avsnp150,intervar_20180118,1000g2015aug_all,clinvar_20170905 --operation g,r,f,f,f,f,f,f --buildver hg19 --nastring '-1' --otherinfo --csvout --thread 10 ${params.annovarLatest_path}/humandb/ --xreffile ${params.annovarLatest_path}/example/gene_fullxref.txt
 
-	python3 ${PWD}/scripts/somaticseqoutput-format_v2_varscan.py ${Sample}.varscan.hg19_multianno.csv ${Sample}.varscan_.csv
+	if [ -s ${Sample}.varscan.hg19_multianno.csv ]; then
+		python3 ${PWD}/scripts/somaticseqoutput-format_v2_varscan.py ${Sample}.varscan.hg19_multianno.csv ${Sample}.varscan_.csv
+	else
+		touch ${Sample}.varscan_.csv
+	fi
 	#cp ${Sample}.varscan_.csv $PWD/Final_Output/${Sample}/
 	sleep 5s
 	"""
@@ -195,13 +264,42 @@ workflow NPM1 {
 	//trimming(samples_ch) | pair_assembly_pear | mapping_reads | sam_conversion
 	trimming(samples_ch) | map_paired_reads | sam_conversion
 	filt3r(trimming.out)
-	minimap_getitd(samples_ch)
+	getitd(sam_conversion.out)
 	coverage(sam_conversion.out)
 	varscan(sam_conversion.out)
 	Annovar(varscan.out)
 	CombineCallers(Annovar.out.join(filt3r.out))
 }
 
+workflow NPM1_aviti {
+	Channel
+		.fromPath(params.input)
+		.splitCsv(header:false)
+		.flatten()
+		.map{ it }
+		.set { samples_ch }
+	
+	main:
+	//trimming(samples_ch) | pair_assembly_pear | mapping_reads | sam_conversion
+	trimming_aviti(samples_ch) | map_paired_reads | sam_conversion
+	filt3r(trimming_aviti.out)
+	minimap_getitd_aviti(samples_ch)
+	coverage(sam_conversion.out)
+	varscan(sam_conversion.out)
+	Annovar(varscan.out)
+	CombineCallers(Annovar.out.join(filt3r.out))
+}
+
+
 workflow.onComplete {
 	log.info ( workflow.success ? "\n\nDone! Output in the 'Final_Output' directory \n" : "Oops .. something went wrong" )
+	def msg = """\
+	Pipeline execution summary
+	---------------------------
+	Completed at : ${workflow.complete}
+	Duration     : ${workflow.duration}
+	""".stripIndent()
+
+	println ""
+	println msg
 }
