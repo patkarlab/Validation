@@ -17,7 +17,7 @@
 ##for combined_panel:/home/pipelines/mutation_detector_nextflow/bedfile/Leukemia_Panel_Myeloid_2023_Feb_hg37_sortd
 ##for multiple_myeloma:/home/pipelines/mutation_detector_nextflow/bedfile/myeloma_combined_sortd
 
-echo "WARNING : change the bedfile and the cnv reference"
+#echo "WARNING : change the bedfile and the cnv reference"
 # for cnvkit reference 
 # 06112021_Leukemia_Panel_sorted.bed : "/home/pipelines/NextSeq_mutation_detector_leukemia/scripts/cnvkit_ref_GeneNames/Reference_labelled.cnn" 
 # Leukemia_Panel_Myeloid_2023_Feb_hg37_sortd.bed : "/home/pipelines/NextSeq_mutation_detector_leukemia/scripts/cnvkit_combpanel/Reference_combpanel.cnn"
@@ -66,11 +66,42 @@ echo "WARNING : change the bedfile and the cnv reference"
 #-resume -bg
 #conda deactivate
 
-# NPM1-FLT3 amplicon MRD
+# For NPM1-FLT3 amplicon MRD - Diagnostics
+#source activate new_base
+#nextflow -c /home/diagnostics/pipelines/Validation/nextflow.config run npm1_mrd_diag.nf -entry NPM1 \
+#--sequences /home/diagnostics/pipelines/Validation/sequences/ \
+#--input /home/diagnostics/pipelines/Validation/samplesheet.csv \
+#--bedfile /home/diagnostics/pipelines/Validation/bedfiles/NPM1_FLT3 \
+#-resume -bg
+
+
+# For NPM1 amplicon MRD
+#source activate new_base
+
+#nextflow -c /home/diagnostics/pipelines/Validation/nextflow.config run npm1_mrd.nf -entry NPM1_MRD \
+#--sequences /home/diagnostics/pipelines/Validation/sequences/ \
+#--input /home/diagnostics/pipelines/Validation/samplesheet.csv \
+#--bedfile /home/diagnostics/pipelines/Validation/bedfiles/NPM1_FLT3 \
+#-profile docker -resume -bg
+
+#conda deactivate
+
+# For FLT3 amplicon MRD
 source activate new_base
-nextflow -c /home/diagnostics/pipelines/Validation/nextflow.config run npm1_mrd.nf -entry NPM1 \
+
+nextflow -c /home/diagnostics/pipelines/Validation/nextflow.config run npm1_mrd.nf -entry FLT3_MRD \
 --sequences /home/diagnostics/pipelines/Validation/sequences/ \
 --input /home/diagnostics/pipelines/Validation/samplesheet.csv \
 --bedfile /home/diagnostics/pipelines/Validation/bedfiles/NPM1_FLT3 \
--resume -bg
+-profile docker -resume -bg
+
 conda deactivate
+
+
+#Validation
+#source activate new_base
+#nextflow -c /home/diagnostics/pipelines/Validation/nextflow.config run validation.nf -entry TEST \
+#--sequences /home/diagnostics/pipelines/Validation/sequences/ \
+#--input /home/diagnostics/pipelines/Validation/samplesheet.csv \
+#-profile docker -resume -bg
+#conda deactivate

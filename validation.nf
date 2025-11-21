@@ -11,6 +11,9 @@ Sample list: ${params.input}
 BED file: ${params.bedfile}.bed
 Sequences in:${params.sequences}
 """
+humandb = file("${params.annovarLatest_path}/humandb/*", checkIfExists: true )
+gene_xref = file("${params.annovarLatest_path}/example/gene_fullxref.txt", checkIfExists: true )
+
 process trimming_trimmomatic {
 	input:
 		val Sample
@@ -301,6 +304,24 @@ process varscan_run{
 	${params.bcftools_path} index -t ${Sample}.varscan_indel.vcf.gz
 	${params.bcftools_path} concat -a ${Sample}.varscan_snp.vcf.gz ${Sample}.varscan_indel.vcf.gz -o ${Sample}.varscan.vcf
 	"""
+}
+
+process varscan_from_bam{
+	input:
+		tuple val (Sample), file(finalBam), file (finalBamBai)
+	output:
+		tuple val(Sample), file("*.varscan.vcf")
+	script:
+	"""
+	${params.samtools} mpileup -f ${params.genome} ${finalBam} > ${Sample}.mpileup
+	${params.java_path}/java -jar ${params.varscan_path} mpileup2snp ${Sample}.mpileup --min-coverage 10 --min-reads2 5 --min-avg-qual 15 --min-var-freq 0.003 --p-value 1e-4 --output-vcf 1 > ${Sample}.varscan_snp.vcf
+	${params.java_path}/java -jar ${params.varscan_path} mpileup2indel ${Sample}.mpileup --min-coverage 10 --min-reads2 5 --min-avg-qual 15 --min-var-freq 0.003 --p-value 1e-4 --output-vcf 1 > ${Sample}.varscan_indel.vcf
+	bgzip -c ${Sample}.varscan_snp.vcf > ${Sample}.varscan_snp.vcf.gz
+	bgzip -c ${Sample}.varscan_indel.vcf > ${Sample}.varscan_indel.vcf.gz
+	${params.bcftools_path} index -t ${Sample}.varscan_snp.vcf.gz
+	${params.bcftools_path} index -t ${Sample}.varscan_indel.vcf.gz
+	${params.bcftools_path} concat -a ${Sample}.varscan_snp.vcf.gz ${Sample}.varscan_indel.vcf.gz -o ${Sample}.varscan.vcf
+	"""	
 }
 
 process lofreq_run{
@@ -720,26 +741,43 @@ process remove_files{
 	"""
 }
 
-workflow VALIDATION {
+process annovar {
+	tag "${Sample}"
+	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*.varscan_.csv'
+	input:
+		tuple val (Sample), file(vcf)
+		file(humandb)
+		file(gene_xref)
+	output:
+		tuple val (Sample), file ("*.hg19_multianno.csv"), file("*.varscan_.csv")
+	script:
+	"""
+	perl /home/TOOLS/tools/annovar/current/bin/convert2annovar.pl -format vcf4 ${vcf}  --outfile ${Sample}.varscan.avinput --withzyg --includeinfo
+	perl /home/TOOLS/tools/annovar/current/bin/table_annovar.pl ${Sample}.varscan.avinput --out ${Sample}.varscan --remove --protocol refGene,cytoBand,cosmic84,popfreq_all_20150413,avsnp150,intervar_20180118,1000g2015aug_all,clinvar_20170905 --operation g,r,f,f,f,f,f,f --buildver hg19 --nastring '-1' --otherinfo --csvout --thread 10 ${humandb} --xreffile ${gene_xref}
+
+	somaticseqoutput-format_v2_varscan.py ${Sample}.varscan.hg19_multianno.csv ${Sample}.varscan_.csv
+	"""	
+}
+
+// workflow VALIDATION {	
+// 	Channel
+// 		.fromPath(params.input)
+// 		.splitCsv(header:false)
+// 		.flatten()
+// 		.map{ it }
+// 		.set { samples_ch }
 	
-	Channel
-		.fromPath(params.input)
-		.splitCsv(header:false)
-		.flatten()
-		.map{ it }
-		.set { samples_ch }
-	
-	main:
-	trimming_trimmomatic(samples_ch) | pair_assembly_pear | mapping_reads | sam_conversion
+// 	main:
+	//trimming_trimmomatic(samples_ch) | pair_assembly_pear | mapping_reads | sam_conversion
 	//unpaird_mapping_reads(trimming_trimmomatic.out) | sam_conver_unpaired
 	//minimap_getitd(samples_ch)
-	RealignerTargetCreator(sam_conversion.out)
-	IndelRealigner(RealignerTargetCreator.out.join(sam_conversion.out)) | BaseRecalibrator
-	PrintReads(IndelRealigner.out.join(BaseRecalibrator.out)) | generatefinalbam
-	hsmetrics_run(generatefinalbam.out)
+	//RealignerTargetCreator(sam_conversion.out)
+	//IndelRealigner(RealignerTargetCreator.out.join(sam_conversion.out)) | BaseRecalibrator
+	//PrintReads(IndelRealigner.out.join(BaseRecalibrator.out)) | generatefinalbam
+	//hsmetrics_run(generatefinalbam.out)
 	//InsertSizeMetrics(sam_conver_unpaired.out)
 	//coverage(generatefinalbam.out)
-	coverview_run(generatefinalbam.out)
+	//coverview_run(generatefinalbam.out)
 	//coverview_report(coverview_run.out)
 	//platypus_run(generatefinalbam.out)
 	//freebayes_run(generatefinalbam.out)
@@ -764,7 +802,7 @@ workflow VALIDATION {
 	//update_freq(merge_csv.out.collect())
 	//Final_Output(coverage.out.join(cnvkit_run.out))
 	//remove_files(merge_csv.out.join(Final_Output.out))
-}
+// }
 
 workflow IfCnv {
 	Channel
@@ -777,6 +815,23 @@ workflow IfCnv {
 	main:
 	ifcnv()
 }
+
+workflow TEST {
+	Channel.fromPath(params.input)
+		.splitCsv(header: false)
+		.map { row ->
+			def sample = row[0]
+			def r1 = file("${params.sequences}/${sample}.final.bam", checkIfExists: false)
+			def r2 = file("${params.sequences}/${sample}.final.bam.bai", checkIfExists: false)
+
+			tuple(sample, r1, r2)
+		}
+		.set { samples_ch }
+	main:
+		varscan_from_bam(samples_ch)
+		annovar(varscan_from_bam.out, humandb, gene_xref)
+}
+
 
 workflow.onComplete {
 	log.info ( workflow.success ? "\n\nDone! Output in the 'Final_Output' directory \n" : "Oops .. something went wrong" )
