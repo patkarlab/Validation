@@ -8,11 +8,11 @@ args = sys.argv
 filename = args[1]
 outfile = args[2]
 
-df = pd.read_csv(filename, dtype='unicode')
+df = pd.read_csv(filename)
 x = df['Otherinfo']
 discarded_column=df.columns.get_loc('Otherinfo')
 data = dict()
-somatic_cols=['Chr','Start','End','Ref','Alt','FILTER','REF_COUNT','ALT_COUNT','VAF%','Func.refGene','Gene.refGene','ExonicFunc.refGene','AAChange.refGene','cosmic84','PopFreqMax']
+somatic_cols=['Chr','Start','End','Ref','Alt','FILTER','SOMATIC_FLAG','REF_COUNT','ALT_COUNT','VAF%','Func.refGene','Gene.refGene','ExonicFunc.refGene','AAChange.refGene','cosmic84','PopFreqMax']
 data.setdefault('FILTER', [])
 data.setdefault('VAF%', [])
 data.setdefault('REF_COUNT', [])
@@ -21,13 +21,14 @@ for row in x:
 	#print (row)	
 	rowitems=row.split('\t')
 	data['FILTER'].append(rowitems[9])
+	#print (rowitems[9])
 	info=rowitems[10].split(';')
 	formatval=rowitems[-1].split(':')
 	readcounts=formatval[1]
-	data['REF_COUNT'].append(formatval[4])
-	data['ALT_COUNT'].append(formatval[5])
-	vaf_calc=(float (formatval[5]) / ( float(formatval[5]) + float(formatval[4]) )) * 100	
-	data['VAF%'].append(round (vaf_calc, 2))
+	data['REF_COUNT'].append(formatval[3].split(',')[0])
+	data['ALT_COUNT'].append(formatval[3].split(',')[1])
+	vaf_calc=(float(formatval[3].split(',')[1]) / (float(formatval[3].split(',')[1]) + float(formatval[3].split(',')[0]) )) * 100
+	data['VAF%'].append(round(vaf_calc, 2))
 
 df1=df.iloc[:,:5]
 #print (data.keys())

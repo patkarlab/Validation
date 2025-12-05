@@ -58,12 +58,13 @@ process MAPBAM {
 	bwa mem -R "@RG\\tID:AML\\tPL:ILLUMINA\\tLB:LIB-MIPS\\tSM:${Sample}\\tPI:300" \
 		-t ${task.cpus} ${genome_dir}/${genome_fasta} ${trim1} ${trim2} | samtools sort -@ ${task.cpus} -o ${Sample}.bam -
 
-	samtools index ${Sample}.bam > ${Sample}.bam.bai
+	samtools index -@ ${task.cpus} ${Sample}.bam > ${Sample}.bam.bai
 	"""
 }
 
 process FILT3R {
-	tag "${Sample}"	
+	tag "${Sample}"
+	label 'process_medium'
 	publishDir "${params.outdir}/${Sample}/", mode: 'copy', pattern: '*filt3r_json.csv'
 	input:
 		tuple val (Sample), file(trim1), file(trim2)
@@ -74,10 +75,10 @@ process FILT3R {
 
 	script:
 	"""
-	filt3r -k 12 --ref ${filt3r_reference} --sequences ${trim1},${trim2} --nb-threads 64 --vcf --out ${Sample}_filt3r.json
+	filt3r -k 12 --ref ${filt3r_reference} --sequences ${trim1},${trim2} --nb-threads ${task.cpus} --vcf --out ${Sample}_filt3r.json
 	convert_json_to_csv.py ${Sample}_filt3r.json ${Sample}_filt3r_json.csv
 	perl ${annovar_path}/convert2annovar.pl -format vcf4 ${Sample}_filt3r.vcf --outfile ${Sample}.filt3r.avinput --withzyg --includeinfo
-	perl ${annovar_path}/table_annovar.pl ${Sample}.filt3r.avinput --out ${Sample}.filt3r --remove --protocol refGene,cytoBand,cosmic84,popfreq_all_20150413,avsnp150,intervar_20180118,1000g2015aug_all,clinvar_20170905 --operation g,r,f,f,f,f,f,f --buildver hg19 --nastring '-1' --otherinfo --csvout --thread 10 ${annovar_path}/humandb/ --xreffile ${annovar_path}/example/gene_fullxref.txt
+	perl ${annovar_path}/table_annovar.pl ${Sample}.filt3r.avinput --out ${Sample}.filt3r --remove --protocol refGene,cytoBand,cosmic84,popfreq_all_20150413,avsnp150,intervar_20180118,1000g2015aug_all,clinvar_20170905 --operation g,r,f,f,f,f,f,f --buildver hg19 --nastring '-1' --otherinfo --csvout --thread ${task.cpus} ${annovar_path}/humandb/ --xreffile ${annovar_path}/example/gene_fullxref.txt
 
 	# Check if the multianno file is empty
 	if [[ ! -s ${Sample}.filt3r.hg19_multianno.csv ]]; then
@@ -105,17 +106,18 @@ process MINIMAP_GETITD {
 	script:
 	"""
 	minimap2 -ax sr -t ${task.cpus} ${minimap_getitd_reference} ${read1} ${read2} > ${Sample}.sam
-	${params.samtools} view -b -h ${Sample}.sam -o ${Sample}.bam
-	${params.samtools} sort ${Sample}.bam -o ${Sample}.sorted.bam
-	${params.samtools} index ${Sample}.sorted.bam
-	${params.samtools} view ${Sample}.sorted.bam -b -h chr13 > ${Sample}.chr13.bam
+	${params.samtools} view -@ ${task.cpus} -b -h ${Sample}.sam -o ${Sample}.bam
+	${params.samtools} sort -@ ${task.cpus} ${Sample}.bam -o ${Sample}.sorted.bam
+	${params.samtools} index -@ ${task.cpus} ${Sample}.sorted.bam
+	${params.samtools} view -@ ${task.cpus} ${Sample}.sorted.bam -b -h chr13 > ${Sample}.chr13.bam
 	${params.bedtools} bamtofastq -i ${Sample}.chr13.bam -fq ${Sample}_chr13.fastq
-	python ${getitd_path}/getitd.py -reference ${getitd_path}/anno/amplicon.txt -anno ${getitd_path}/anno/amplicon_kayser.tsv -forward_adapter AATGATACGGCGACCACCGAGATCTACACTCTTTCCCTACACGACGCTCTTCCGATCT -reverse_adapter CAAGCAGAAGACGGCATACGAGATCGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT -nkern 8 ${Sample} ${Sample}_chr13.fastq
+	python ${getitd_path}/getitd.py -reference ${getitd_path}/anno/amplicon.txt -anno ${getitd_path}/anno/amplicon_kayser.tsv -forward_adapter AATGATACGGCGACCACCGAGATCTACACTCTTTCCCTACACGACGCTCTTCCGATCT -reverse_adapter CAAGCAGAAGACGGCATACGAGATCGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT -nkern ${task.cpus} ${Sample} ${Sample}_chr13.fastq
 	"""
 }
 
 process GETITD {
 	tag "${Sample}"
+	label 'process_medium'
 	publishDir "${params.outdir}/${Sample}/", mode: 'copy', pattern: '*_getitd'
 	input:
 			tuple val (Sample), file(bam), file(bamBai)
@@ -126,12 +128,14 @@ process GETITD {
 	"""
 	${params.samtools} view ${bam} -b -h chr13 > ${Sample}.chr13.bam
 	${params.bedtools} bamtofastq -i ${Sample}.chr13.bam -fq ${Sample}_chr13.fastq
-	python ${getitd_path}/getitd.py -reference ${getitd_path}/anno/amplicon.txt -anno ${getitd_path}/anno/amplicon_kayser.tsv -forward_adapter AATGATACGGCGACCACCGAGATCTACACTCTTTCCCTACACGACGCTCTTCCGATCT -reverse_adapter CAAGCAGAAGACGGCATACGAGATCGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT -nkern 8 ${Sample} ${Sample}_chr13.fastq
+	python ${getitd_path}/getitd.py -reference ${getitd_path}/anno/amplicon.txt -anno ${getitd_path}/anno/amplicon_kayser.tsv -forward_adapter AATGATACGGCGACCACCGAGATCTACACTCTTTCCCTACACGACGCTCTTCCGATCT -reverse_adapter CAAGCAGAAGACGGCATACGAGATCGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT -nkern ${task.cpus} ${Sample} ${Sample}_chr13.fastq
 	"""
 }
 
 process FLT3_ITD_EXT {
+	errorStrategy 'ignore'
 	tag "${Sample}"
+	label 'process_medium'
 	input:
 		tuple val (Sample), file(trim1), file(trim2)	
 	output:
@@ -146,6 +150,7 @@ process FLT3_ITD_EXT {
 
 process COVERAGE {
 	tag "${Sample}"
+	label 'process_low'
 	publishDir "${params.outdir}/${Sample}/", mode: 'copy'
 	input:
 		tuple val (Sample), file(bam), file(bamBai)
@@ -161,6 +166,7 @@ process COVERAGE {
 
 process VARSCAN {
 	tag "${Sample}"	
+	label 'process_medium'
 	input:
 		tuple val (Sample), file(bam), file (bamBai)
 		file (genome_dir)
@@ -171,7 +177,7 @@ process VARSCAN {
 	script:
 	"""
 	${params.samtools} mpileup -d 1000000 -B -A -a -l ${bedfile} -f ${genome_dir}/${genome_fasta} ${bam} > ${Sample}.mpileup
-	${params.java_path}/java -jar ${params.varscan_path} mpileup2indel ${Sample}.mpileup --min-reads2 1 --min-avg-qual 5 --min-var-freq 0.000001 --p-value 1e-1 --output-vcf 1 > ${Sample}.varscan_indel.vcf
+	${params.java_path}/java -Xmx${task.memory.toGiga()}g -jar ${params.varscan_path} mpileup2indel ${Sample}.mpileup --min-reads2 1 --min-avg-qual 5 --min-var-freq 0.000001 --p-value 1e-1 --output-vcf 1 > ${Sample}.varscan_indel.vcf
 	bgzip -c ${Sample}.varscan_indel.vcf > ${Sample}.varscan_indel.vcf.gz
 	${params.bcftools_path} index -t ${Sample}.varscan_indel.vcf.gz
 	${params.bcftools_path} concat -a ${Sample}.varscan_indel.vcf.gz -o ${Sample}.varscan.vcf
@@ -180,6 +186,7 @@ process VARSCAN {
 
 process ANNOVAR {
 	tag "${Sample}"
+	label 'process_medium'
 	publishDir "${params.outdir}/${Sample}/", mode: 'copy', pattern: '*.varscan.csv'
 	input:
 		tuple val (Sample), file(varscanVcf)
@@ -189,7 +196,7 @@ process ANNOVAR {
 	script:
 	"""
 	perl ${annovar_path}/convert2annovar.pl -format vcf4 ${varscanVcf} --outfile ${Sample}.varscan.avinput --withzyg --includeinfo
-	perl ${annovar_path}/table_annovar.pl ${Sample}.varscan.avinput --out ${Sample}.varscan --remove --protocol refGene,cytoBand,cosmic84,popfreq_all_20150413,avsnp150,intervar_20180118,1000g2015aug_all,clinvar_20170905 --operation g,r,f,f,f,f,f,f --buildver hg19 --nastring '-1' --otherinfo --csvout --thread 10 ${annovar_path}/humandb/ --xreffile ${annovar_path}/example/gene_fullxref.txt
+	perl ${annovar_path}/table_annovar.pl ${Sample}.varscan.avinput --out ${Sample}.varscan --remove --protocol refGene,cytoBand,cosmic84,popfreq_all_20150413,avsnp150,intervar_20180118,1000g2015aug_all,clinvar_20170905 --operation g,r,f,f,f,f,f,f --buildver hg19 --nastring '-1' --otherinfo --csvout --thread ${task.cpus} ${annovar_path}/humandb/ --xreffile ${annovar_path}/example/gene_fullxref.txt
 
 	if [ -s ${Sample}.varscan.hg19_multianno.csv ]; then
 		somaticseqoutput-format_v2_varscan.py ${Sample}.varscan.hg19_multianno.csv ${Sample}.varscan.csv
@@ -254,9 +261,9 @@ workflow NPM1_MRD {
 	TRIM(fastq_ch, illumina_adapters, nextera_adapters)
 	MAPBAM(TRIM.out, genome_dir, genome_fasta)
 	COVERAGE(MAPBAM.out, bedfile)
-	VARSCAN(MAPBAM.out, genome_dir, genome_fasta, bedfile)
-	ANNOVAR(VARSCAN.out, annovar_path)
-	COMBINE_NPM1(ANNOVAR.out.join(COVERAGE.out))
+	//VARSCAN(MAPBAM.out, genome_dir, genome_fasta, bedfile)
+	//ANNOVAR(VARSCAN.out, annovar_path)
+	//COMBINE_NPM1(ANNOVAR.out.join(COVERAGE.out))
 }
 workflow FLT3_MRD {
 	Channel.fromPath(params.input)

@@ -759,15 +759,15 @@ process annovar {
 	"""	
 }
 
-// workflow VALIDATION {	
-// 	Channel
-// 		.fromPath(params.input)
-// 		.splitCsv(header:false)
-// 		.flatten()
-// 		.map{ it }
-// 		.set { samples_ch }
+workflow VALIDATION {	
+	Channel
+	.fromPath(params.input)
+	.splitCsv(header:false)
+	.flatten()
+	.map{ it }
+	.set { samples_ch }
 	
-// 	main:
+	main:
 	//trimming_trimmomatic(samples_ch) | pair_assembly_pear | mapping_reads | sam_conversion
 	//unpaird_mapping_reads(trimming_trimmomatic.out) | sam_conver_unpaired
 	//minimap_getitd(samples_ch)
