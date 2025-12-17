@@ -199,7 +199,7 @@ process ANNOVAR {
 	perl ${annovar_path}/table_annovar.pl ${Sample}.varscan.avinput --out ${Sample}.varscan --remove --protocol refGene,cytoBand,cosmic84,popfreq_all_20150413,avsnp150,intervar_20180118,1000g2015aug_all,clinvar_20170905 --operation g,r,f,f,f,f,f,f --buildver hg19 --nastring '-1' --otherinfo --csvout --thread ${task.cpus} ${annovar_path}/humandb/ --xreffile ${annovar_path}/example/gene_fullxref.txt
 
 	if [ -s ${Sample}.varscan.hg19_multianno.csv ]; then
-		somaticseqoutput-format_v2_varscan.py ${Sample}.varscan.hg19_multianno.csv ${Sample}.varscan.csv
+		somaticseqoutput-format_varscan_annovar_20191024.py ${Sample}.varscan.hg19_multianno.csv ${Sample}.varscan.csv
 	else
 		touch ${Sample}.varscan.csv
 	fi
@@ -261,9 +261,9 @@ workflow NPM1_MRD {
 	TRIM(fastq_ch, illumina_adapters, nextera_adapters)
 	MAPBAM(TRIM.out, genome_dir, genome_fasta)
 	COVERAGE(MAPBAM.out, bedfile)
-	//VARSCAN(MAPBAM.out, genome_dir, genome_fasta, bedfile)
-	//ANNOVAR(VARSCAN.out, annovar_path)
-	//COMBINE_NPM1(ANNOVAR.out.join(COVERAGE.out))
+	VARSCAN(MAPBAM.out, genome_dir, genome_fasta, bedfile)
+	ANNOVAR(VARSCAN.out, annovar_path)
+	COMBINE_NPM1(ANNOVAR.out.join(COVERAGE.out))
 }
 workflow FLT3_MRD {
 	Channel.fromPath(params.input)

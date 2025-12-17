@@ -87,15 +87,15 @@
 #conda deactivate
 
 # For FLT3 amplicon MRD
-#source activate new_base
+source activate new_base
 
-#nextflow -c /home/diagnostics/pipelines/Validation/nextflow.config run npm1_mrd.nf -entry FLT3_MRD \
-#--sequences /home/diagnostics/pipelines/Validation/sequences/ \
-#--input /home/diagnostics/pipelines/Validation/samplesheet.csv \
-#--bedfile /home/diagnostics/pipelines/Validation/bedfiles/NPM1_FLT3 \
-#-profile docker -resume -bg
+nextflow -c /home/diagnostics/pipelines/Validation/nextflow.config run npm1_mrd.nf -entry FLT3_MRD \
+--sequences /home/diagnostics/pipelines/Validation/sequences/ \
+--input /home/diagnostics/pipelines/Validation/samplesheet.csv \
+--bedfile /home/diagnostics/pipelines/Validation/bedfiles/NPM1_FLT3 \
+-profile docker -resume -bg
 
-#conda deactivate
+conda deactivate
 
 
 #Validation
@@ -106,15 +106,4 @@
 #-profile docker -resume -bg
 #conda deactivate
 
-
-# VALIDATION v2
-source activate new_base
-
-nextflow -c /home/diagnostics/pipelines/Validation/nextflow.config run npm1_mrd.nf -entry NPM1_MRD \
---sequences /home/diagnostics/pipelines/Validation/sequences/ \
---input /home/diagnostics/pipelines/Validation/samplesheet.csv \
---bedfile /home/pipelines/Consensus_pipeline_with_espresso/bedfiles/CEBPA_01122025_sortd \
--resume -bg
-
-#conda deactivate
 
