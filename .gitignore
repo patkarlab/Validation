@@ -3,7 +3,8 @@
 .nextflow/
 .nextflow.pid
 sample_list.csv
-Final_Output*
+Final_Output*/
+run_nextflow.sh
 samplesheet.csv
 sequences/
 work/
