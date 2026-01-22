@@ -137,12 +137,12 @@ process FLT3_ITD_EXT {
 	tag "${Sample}"
 	label 'process_medium'
 	input:
-		tuple val (Sample), file(trim1), file(trim2)	
+		tuple val (Sample), file(bam), file(bamBai)	
 	output:
 		tuple val (Sample), file("*vcf")
 	script:
 	"""
-	perl /biosoft/FLT3_ITD_ext/FLT3_ITD_ext.pl -a 0 -f1 ${trim1} -f2 ${trim2} -o ./ -g hg19 -n amplicon
+	perl /biosoft/FLT3_ITD_ext/FLT3_ITD_ext.pl --bam ${bam} -o ./ || true
 
 	"""
 }
@@ -285,7 +285,7 @@ workflow FLT3_MRD {
 	MAPBAM(TRIM.out, genome_dir, genome_fasta)
 	FILT3R(TRIM.out, filt3r_reference, annovar_path)
 	MINIMAP_GETITD(fastq_ch, getitd_path, minimap_getitd_reference)
-	FLT3_ITD_EXT(TRIM.out)
+	FLT3_ITD_EXT(MAPBAM.out)
 	COVERAGE(MAPBAM.out, bedfile)
 	VARSCAN(MAPBAM.out, genome_dir, genome_fasta, bedfile)
 	ANNOVAR(VARSCAN.out, annovar_path)

@@ -86,9 +86,9 @@ else:
 			'start_chr13_bp_getITD','end_chr13_bp_getITD', 'vaf_getITD','size_FiLT3r','occurrence_FiLT3r' ,
 			'wt_coverage_FiLT3r', 'VAF_FiLT3r','sequence_FiLT3r','reference_pos_FiLT3r','is_wt_duplication_FiLT3r' ]]
 
-			#group rows which have same length & sequence in getITD and keep rows with top2 vaf from flt3r
+			#group rows which have same length & sequence in getITD and keep rows with top vaf from flt3r
 			merged_df = merged_df.groupby(['length_getITD','seq_getITD']).apply(lambda x: x.sort_values('occurrence_FiLT3r',
-			ascending=False).head(2))
+			ascending=False).head(1))
 
 			#rename columns
 			merged_df.rename(columns={'length_getITD':'ITD_length_getITD', 'counts_getITD':'Alt_counts_getITD',
