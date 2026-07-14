@@ -1,8 +1,6 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
-"mkdir Coverview".execute()
-
 log.info """
 STARTING PIPELINE
 =*=*=*=*=*=*=*=*=
@@ -31,7 +29,7 @@ process trimming_trimmomatic {
 }
 
 process minimap_getitd {
-	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*_getitd'
+	publishDir "${params.outdir}/Final_Output/${Sample}/", mode: 'copy', pattern: '*_getitd'
 	input:
 		val (Sample)
 	output:
@@ -82,7 +80,7 @@ process unpaird_mapping_reads{
 }
 
 process sam_conversion{
-	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*.sorted.bam*'
+	publishDir "${params.outdir}/Final_Output/${Sample}/", mode: 'copy', pattern: '*.sorted.bam*'
 	input:
 		tuple val (Sample), file (samfile)
 	output:
@@ -96,7 +94,7 @@ process sam_conversion{
 }
 
 process sam_conver_unpaired{
-	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*.sorted.bam*'
+	publishDir "${params.outdir}/Final_Output/${Sample}/", mode: 'copy', pattern: '*.sorted.bam*'
 	input:
 		tuple val (Sample), file (samfile)
 	output:
@@ -155,7 +153,7 @@ process PrintReads{
 }
 
 process generatefinalbam{
-	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*.final.bam*'
+	publishDir "${params.outdir}/Final_Output/${Sample}/", mode: 'copy', pattern: '*.final.bam*'
 	input:
 		tuple val (Sample), file(alignedRecalibratedBam)
 	output:
@@ -174,7 +172,7 @@ process generatefinalbam{
 }
 
 process hsmetrics_run{
-	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*_hsmetrics.txt'
+	publishDir "${params.outdir}/Final_Output/${Sample}/", mode: 'copy', pattern: '*_hsmetrics.txt'
 	input:
 		tuple val(Sample), file(finalBam), file (finalBamBai), file (oldfinalBam), file (oldfinalBamBai)
 	output:
@@ -182,12 +180,12 @@ process hsmetrics_run{
 	script:
 	"""
 	${params.java_path}/java -jar ${params.picard_path} CollectHsMetrics I= ${finalBam} O= ${Sample}_hsmetrics.txt BAIT_INTERVALS= ${params.bedfile}.interval_list TARGET_INTERVALS= ${params.bedfile}.interval_list R= ${params.genome} VALIDATION_STRINGENCY=LENIENT
-	${params.hsmetrics_all} $PWD/Final_Output/hsmetrics.tsv ${Sample} ${Sample}_hsmetrics.txt
+	${params.hsmetrics_all} ${params.outdir}/Final_Output/hsmetrics.tsv ${Sample} ${Sample}_hsmetrics.txt
 	"""
 }
 
 process InsertSizeMetrics {
-	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*insert_size*' 
+	publishDir "${params.outdir}/Final_Output/${Sample}/", mode: 'copy', pattern: '*insert_size*' 
 	input:
 		tuple val(Sample), file (bamFile), file(bamBai)
 	output:
@@ -200,8 +198,8 @@ process InsertSizeMetrics {
 }
 
 process coverage {
-	publishDir "$PWD/${Sample}/coverage/", mode: 'copy', pattern: '*.counts.bed'
-	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*'
+	publishDir "${params.outdir}/${Sample}/coverage/", mode: 'copy', pattern: '*.counts.bed'
+	publishDir "${params.outdir}/Final_Output/${Sample}/", mode: 'copy', pattern: '*'
 	input:
 		tuple val (Sample), file(finalBams), file(finalBamBai), file (oldfinalBam), file (oldfinalBamBai)
 	output:
@@ -211,16 +209,16 @@ process coverage {
 	${params.bedtools} bamtobed -i ${finalBams[0]} > ${Sample}.bed
 	${params.bedtools} coverage -counts -a ${params.bedfile}.bed -b ${Sample}.bed > ${Sample}.counts.bed
 	${params.bedtools} coverage -counts -a ${params.flt3_bedfile}.bed -b ${Sample}.bed > ${Sample}_pindel.counts.bed
-	mkdir -p $PWD/${Sample}/coverage/
-	cp *.counts.bed $PWD/${Sample}/coverage/
+	mkdir -p ${params.outdir}/${Sample}/coverage/
+	cp *.counts.bed ${params.outdir}/${Sample}/coverage/
 	"""
 }
 
 process coverview_run {
 	executor="local"
-	publishDir "$PWD/${Sample}/Coverview/", mode: 'copy', pattern: '*.coverview_regions.csv'
-	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*.coverview_regions.csv'
-	publishDir "$PWD/Coverview/", mode: 'copy', pattern: '*.coverview_regions.csv'
+	publishDir "${params.outdir}/${Sample}/Coverview/", mode: 'copy', pattern: '*.coverview_regions.csv'
+	publishDir "${params.outdir}/Final_Output/${Sample}/", mode: 'copy', pattern: '*.coverview_regions.csv'
+	publishDir "${params.outdir}/Coverview/", mode: 'copy', pattern: '*.coverview_regions.csv'
 	input:
 		tuple val (Sample), file(finalBam), file(finalBamBai), file (oldfinalBam), file (oldfinalBamBai)
 	output:
@@ -246,7 +244,7 @@ process coverview_report {
 
 process mutect2_run{
 	maxForks 10
-	publishDir "$PWD/${Sample}/variants/", mode: 'copy', pattern: '*.mutect2.vcf'
+	publishDir "${params.outdir}/${Sample}/variants/", mode: 'copy', pattern: '*.mutect2.vcf'
 	input:
 		tuple val(Sample), file(finalBam), file (finalBamBai), file (oldfinalBam), file (oldfinalBamBai)
 	output:
@@ -260,7 +258,7 @@ process mutect2_run{
 }
 
 process freebayes_run{
-	publishDir "$PWD/${Sample}/variants/", mode: 'copy', pattern: '*.freebayes.vcf'
+	publishDir "${params.outdir}/${Sample}/variants/", mode: 'copy', pattern: '*.freebayes.vcf'
 	input:
 		tuple val (Sample), file(finalBam), file (finalBamBai), file (oldfinalBam), file (oldfinalBamBai)
 	output:
@@ -272,7 +270,7 @@ process freebayes_run{
 }
 
 process vardict_run {
-	publishDir "$PWD/${Sample}/variants/", mode: 'copy', pattern: '*.vardict.vcf'
+	publishDir "${params.outdir}/${Sample}/variants/", mode: 'copy', pattern: '*.vardict.vcf'
 	input:
 		tuple val (Sample), file(finalBam), file (finalBamBai), file (oldfinalBam), file (oldfinalBamBai)
 	output:
@@ -284,11 +282,11 @@ process vardict_run {
 }
 
 process varscan_run{
-	publishDir "$PWD/${Sample}/variants/", mode: 'copy', pattern: '*.varscan_snp.vcf'
-	publishDir "$PWD/${Sample}/variants/", mode: 'copy', pattern: '*.varscan_indel.vcf'
-	publishDir "$PWD/${Sample}/variants/", mode: 'copy', pattern: '*.varscan_snp.vcf.gz'
-	publishDir "$PWD/${Sample}/variants/", mode: 'copy', pattern: '*.varscan_indel.vcf.gz'
-	publishDir "$PWD/${Sample}/variants/", mode: 'copy', pattern: '*.varscan.vcf'
+	publishDir "${params.outdir}/${Sample}/variants/", mode: 'copy', pattern: '*.varscan_snp.vcf'
+	publishDir "${params.outdir}/${Sample}/variants/", mode: 'copy', pattern: '*.varscan_indel.vcf'
+	publishDir "${params.outdir}/${Sample}/variants/", mode: 'copy', pattern: '*.varscan_snp.vcf.gz'
+	publishDir "${params.outdir}/${Sample}/variants/", mode: 'copy', pattern: '*.varscan_indel.vcf.gz'
+	publishDir "${params.outdir}/${Sample}/variants/", mode: 'copy', pattern: '*.varscan.vcf'
 	input:
 		tuple val (Sample), file(finalBam), file (finalBamBai), file (oldfinalBam), file (oldfinalBamBai)
 	output:
@@ -325,7 +323,7 @@ process varscan_from_bam{
 }
 
 process lofreq_run{
-	publishDir "$PWD/${Sample}/variants/", mode: 'copy', pattern: '*.lofreq.filtered.vcf'
+	publishDir "${params.outdir}/${Sample}/variants/", mode: 'copy', pattern: '*.lofreq.filtered.vcf'
 	input:
 		tuple val (Sample), file(finalBam), file (finalBamBai), file (oldfinalBam), file (oldfinalBamBai)
 	output:
@@ -340,7 +338,7 @@ process lofreq_run{
 }
 
 process strelka_run{
-	publishDir "$PWD/${Sample}/variants/strelka", mode: 'copy', pattern: '*.strelka.vcf'
+	publishDir "${params.outdir}/${Sample}/variants/strelka", mode: 'copy', pattern: '*.strelka.vcf'
 	input:
 		tuple val (Sample), file(finalBam), file (finalBamBai), file (oldfinalBam), file (oldfinalBamBai)
 	output:
@@ -350,8 +348,8 @@ process strelka_run{
 	${params.strelka_path}/configureStrelkaGermlineWorkflow.py --bam ${finalBam} --referenceFasta ${params.genome} --callRegions  ${params.bedfile}.bed.gz --targeted --runDir ${PWD}/${Sample}/variants/strelka/
 	${PWD}/${Sample}/variants/strelka/runWorkflow.py -m local -j 20
 	gunzip -f ${PWD}/${Sample}/variants/strelka/results/variants/variants.vcf.gz
-	mv ${PWD}/${Sample}/variants/strelka/results/variants/variants.vcf $PWD/${Sample}/variants/${Sample}.strelka.vcf
-	cp $PWD/${Sample}/variants/${Sample}.strelka.vcf ./
+	mv ${PWD}/${Sample}/variants/strelka/results/variants/variants.vcf ${params.outdir}/${Sample}/variants/${Sample}.strelka.vcf
+	cp ${params.outdir}/${Sample}/variants/${Sample}.strelka.vcf ./
 
 	${params.strelka_path}/configureStrelkaSomaticWorkflow.py --normalBam ${params.NA12878_bam}  --tumorBam ${finalBam} --referenceFasta ${params.genome} --callRegions ${params.bedfile}.bed.gz --targeted --runDir ${PWD}/${Sample}/variants/strelka-somatic/
 	${PWD}/${Sample}/variants/strelka-somatic/runWorkflow.py -m local -j 20
@@ -361,7 +359,7 @@ process strelka_run{
 }
 
 process platypus_run{
-	publishDir "$PWD/${Sample}/variants/", mode: 'copy', pattern: '*.platypus.vcf'
+	publishDir "${params.outdir}/${Sample}/variants/", mode: 'copy', pattern: '*.platypus.vcf'
 	input:
 		tuple val (Sample), file(finalBams), file(finalBamBai), file (oldfinalBam), file (oldfinalBamBai)
 	output:
@@ -373,9 +371,9 @@ process platypus_run{
 }
 
 process somaticSeq_run {
-	publishDir "$PWD/${Sample}/variants/", mode: 'copy', pattern: '*.somaticseq.vcf'
-	publishDir "$PWD/${Sample}/variants/", mode: 'copy', pattern: '*.avinput'
-	publishDir "$PWD/${Sample}/ANNOVAR/", mode: 'copy', pattern: '*.hg19_multianno.csv'
+	publishDir "${params.outdir}/${Sample}/variants/", mode: 'copy', pattern: '*.somaticseq.vcf'
+	publishDir "${params.outdir}/${Sample}/variants/", mode: 'copy', pattern: '*.avinput'
+	publishDir "${params.outdir}/${Sample}/ANNOVAR/", mode: 'copy', pattern: '*.hg19_multianno.csv'
 	input:
 			tuple val (Sample), file(freebayesVcf), file(platypusVcf), file(mutectVcf), file(vardictVcf), file(varscanVcf), file(lofreqVcf), file(strelkaVcf),file(finalBam), file(finalBamBai), file(oldfinalBam), file(oldfinalBamBai)
 	output:
@@ -393,7 +391,7 @@ process somaticSeq_run {
 	${params.vcf_sorter_path} ${Sample}_freebayes_cnvs.vcf ${Sample}_freebayes_cnvs_sort.vcf
 	${params.vcf_sorter_path} ${Sample}_freebayes_indels.vcf ${Sample}_freebayes_indels_sort.vcf
 
-	somaticseq_parallel.py --output-directory ${PWD}/${Sample}/variants/${Sample}.somaticseq --genome-reference ${params.genome} --inclusion-region ${params.bedfile}.bed --threads 25 --algorithm xgboost  --dbsnp-vcf  /home/reference_genomes/dbSNPGATK/dbsnp_138.hg19.somatic.vcf single --bam-file $PWD/Final_Output/${Sample}/${Sample}.final.bam --mutect2-vcf ${PWD}/${Sample}/variants/${Sample}.mutect2.vcf --vardict-vcf ${PWD}/${Sample}/variants/${Sample}.vardict.vcf --varscan-vcf ${PWD}/${Sample}/variants/${Sample}.varscan.vcf --lofreq-vcf ${PWD}/${Sample}/variants/${Sample}.lofreq.filtered.vcf --strelka-vcf ${PWD}/${Sample}/variants/${Sample}.strelka.vcf --sample-name ${Sample} --arbitrary-snvs ${Sample}_freebayes_cnvs_sort.vcf ${Sample}_platypu_cnvs_sort.vcf --arbitrary-indels ${Sample}_freebayes_indels_sort.vcf ${Sample}_platypus_indels_sort.vcf
+	somaticseq_parallel.py --output-directory ${PWD}/${Sample}/variants/${Sample}.somaticseq --genome-reference ${params.genome} --inclusion-region ${params.bedfile}.bed --threads 25 --algorithm xgboost  --dbsnp-vcf  /home/reference_genomes/dbSNPGATK/dbsnp_138.hg19.somatic.vcf single --bam-file ${params.outdir}/Final_Output/${Sample}/${Sample}.final.bam --mutect2-vcf ${PWD}/${Sample}/variants/${Sample}.mutect2.vcf --vardict-vcf ${PWD}/${Sample}/variants/${Sample}.vardict.vcf --varscan-vcf ${PWD}/${Sample}/variants/${Sample}.varscan.vcf --lofreq-vcf ${PWD}/${Sample}/variants/${Sample}.lofreq.filtered.vcf --strelka-vcf ${PWD}/${Sample}/variants/${Sample}.strelka.vcf --sample-name ${Sample} --arbitrary-snvs ${Sample}_freebayes_cnvs_sort.vcf ${Sample}_platypu_cnvs_sort.vcf --arbitrary-indels ${Sample}_freebayes_indels_sort.vcf ${Sample}_platypus_indels_sort.vcf
 
 	${params.vcf_sorter_path} ${PWD}/${Sample}/variants/${Sample}.somaticseq/Consensus.sSNV.vcf ${PWD}/${Sample}/variants/${Sample}.somaticseq/somaticseq_snv.vcf
 	
@@ -412,14 +410,14 @@ process somaticSeq_run {
 	cp ${Sample}.somaticseq.vcf ${PWD}/Final_Output/${Sample}/
 	perl ${params.annovarLatest_path}/table_annovar.pl ${Sample}.somaticseq.avinput --out ${Sample}.somaticseq --remove --protocol refGene,cytoBand,cosmic84,popfreq_all_20150413,avsnp150,intervar_20180118,1000g2015aug_all,clinvar_20170905 --operation g,r,f,f,f,f,f,f --buildver hg19 --nastring '-1' --otherinfo --csvout --thread 10 ${params.annovarLatest_path}/humandb/ --xreffile ${params.annovarLatest_path}/example/gene_fullxref.txt
 	${params.cancervar} ${Sample}.somaticseq.hg19_multianno.csv ${Sample}
-	cp ${Sample}myanno.hg19_multianno.txt.cancervar.ensemble.pred $PWD/${Sample}/
+	cp ${Sample}myanno.hg19_multianno.txt.cancervar.ensemble.pred ${params.outdir}/${Sample}/
 	"""
 }
 
 process mocha {
-	publishDir "$PWD/Final_Output/${Sample}/MoChA/", mode: 'copy', pattern: '*.png'
-	publishDir "$PWD/Final_Output/${Sample}/MoChA/", mode: 'copy', pattern: '*.pdf'
-	publishDir "$PWD/Final_Output/${Sample}/MoChA/", mode: 'copy', pattern: '*.tsv'
+	publishDir "${params.outdir}/Final_Output/${Sample}/MoChA/", mode: 'copy', pattern: '*.png'
+	publishDir "${params.outdir}/Final_Output/${Sample}/MoChA/", mode: 'copy', pattern: '*.pdf'
+	publishDir "${params.outdir}/Final_Output/${Sample}/MoChA/", mode: 'copy', pattern: '*.tsv'
 	input:
 		tuple val(Sample), file (somaticseqVcf), file (MultiannoCsv)
 	output:
@@ -440,13 +438,13 @@ process igv_reports{
 	"""
 	perl ${params.annovarLatest_path}/table_annovar.pl ${somaticVcf} --out ${Sample}.annovar --remove --protocol refGene,cytoBand,cosmic84,popfreq_all_20150413,avsnp150,intervar_20180118,1000g2015aug_all,clinvar_20170905 --operation g,r,f,f,f,f,f,f --buildver hg19 --nastring . --otherinfo --thread 10 ${params.annovarLatest_path}/humandb/ --xreffile ${params.annovarLatest_path}/example/gene_fullxref.txt -vcfinput
 
-	${params.igv_script} ${params.genome} ${Sample}.annovar.hg19_multianno.vcf $PWD/Final_Output/${Sample}/${Sample}.final.bam $PWD/Final_Output/${Sample}/${Sample}_igv.html
+	${params.igv_script} ${params.genome} ${Sample}.annovar.hg19_multianno.vcf ${params.outdir}/Final_Output/${Sample}/${Sample}.final.bam ${params.outdir}/Final_Output/${Sample}/${Sample}_igv.html
 	sleep 1s
 	"""
 }
 
 process cnvkit_run {
-	publishDir "$PWD/${Sample}/cnvkit/", mode: 'copy', pattern: '*.cn*'
+	publishDir "${params.outdir}/${Sample}/cnvkit/", mode: 'copy', pattern: '*.cn*'
 	input:
 		tuple val (Sample), file(finalBam), file(finalBamBai), file (oldfinalBam), file (oldfinalBamBai)
 	output:
@@ -459,22 +457,22 @@ process cnvkit_run {
 	${params.cnvkit_path} ${finalBam} ${params.cnvkitRef} ${PWD}/${Sample}/cnvkit/
 	#/${params.gene_scatter}/custom_scatter_v3.py ${params.gene_scatter}/chr_list_all.txt ${PWD}/${Sample}/cnvkit/${Sample}.final.cnr ${PWD}/${Sample}/cnvkit/${Sample}.final.cns ${Sample}
 	/${params.gene_scatter}/custom_scatter_chrwise.py ${params.gene_scatter_list}/chrwise_list.txt ${PWD}/${Sample}/cnvkit/${Sample}.final.cnr ${PWD}/${Sample}/cnvkit/${Sample}.final.cns ${Sample}_chr_
-	cp *gene_scatter.pdf $PWD/${Sample}/cnvkit/
-	cp *gene_scatter.pdf $PWD/Final_Output/${Sample}/
+	cp *gene_scatter.pdf ${params.outdir}/${Sample}/cnvkit/
+	cp *gene_scatter.pdf ${params.outdir}/Final_Output/${Sample}/
 	cp ${PWD}/${Sample}/cnvkit/${Sample}.final-scatter.png ${PWD}/${Sample}/cnvkit/${Sample}.final-diagram.pdf ${PWD}/Final_Output/${Sample}/	
 	"""
 }
 
 process ifcnv_run {
-	//publishDir "$PWD/Final_Output/ifCNV/", mode: 'copy', pattern: '*.html'
-	//publishDir "$PWD/Final_Output/ifCNV/", mode: 'copy', pattern: '*.tsv'
+	//publishDir "${params.outdir}/Final_Output/ifCNV/", mode: 'copy', pattern: '*.html'
+	//publishDir "${params.outdir}/Final_Output/ifCNV/", mode: 'copy', pattern: '*.tsv'
 	input:
 		val Sample
 	output:
 		val (Sample)
 	script:
 	"""
-	${params.links} $PWD/Final_Output/ ${params.input}
+	${params.links} ${params.outdir}/Final_Output/ ${params.input}
 	#${params.ifcnv} ./ ${params.bedfile}.bed ./
 	#touch -c *.bam.bai
 	mkdir ifCNV_chrwise
@@ -484,41 +482,41 @@ process ifcnv_run {
 
 	for i in `cat ${params.input}`
 	do
-		if [ ! -d $PWD/Final_Output/\${i}/ifCNV_chrwise ]; then
-			mkdir $PWD/Final_Output/\${i}/ifCNV_chrwise
+		if [ ! -d ${params.outdir}/Final_Output/\${i}/ifCNV_chrwise ]; then
+			mkdir ${params.outdir}/Final_Output/\${i}/ifCNV_chrwise
 		fi
 
-		if [ ! -d $PWD/Final_Output/\${i}/ifCNV_genewise ]; then
-			mkdir $PWD/Final_Output/\${i}/ifCNV_genewise
+		if [ ! -d ${params.outdir}/Final_Output/\${i}/ifCNV_genewise ]; then
+			mkdir ${params.outdir}/Final_Output/\${i}/ifCNV_genewise
 		fi
 	done
 
 	if [ -f ifCNV_chrwise/ifCNV.tsv ]; then
 		for i in `awk 'NR>1{print \$3}' ifCNV_chrwise/ifCNV.tsv | awk 'BEGIN{FS="."}{print \$1}' | sort | uniq`
 		do
-			cp ifCNV_chrwise/\${i}.*.html $PWD/Final_Output/\${i}/ifCNV_chrwise/
+			cp ifCNV_chrwise/\${i}.*.html ${params.outdir}/Final_Output/\${i}/ifCNV_chrwise/
 		done
 	fi
 
 	if [ -f ifCNV_genewise/ifCNV.tsv ]; then
 		for i in `awk 'NR>1{print \$3}' ifCNV_genewise/ifCNV.tsv | awk 'BEGIN{FS="."}{print \$1}' | sort | uniq` 
 		do		
-			cp ifCNV_genewise/\${i}.*.html $PWD/Final_Output/\${i}/ifCNV_genewise/
+			cp ifCNV_genewise/\${i}.*.html ${params.outdir}/Final_Output/\${i}/ifCNV_genewise/
 		done
 	fi
 	"""
 }
 
 process ifcnv {
-	//publishDir "$PWD/Final_Output/ifCNV/", mode: 'copy', pattern: '*.html'
-	//publishDir "$PWD/Final_Output/ifCNV/", mode: 'copy', pattern: '*.tsv'
+	//publishDir "${params.outdir}/Final_Output/ifCNV/", mode: 'copy', pattern: '*.html'
+	//publishDir "${params.outdir}/Final_Output/ifCNV/", mode: 'copy', pattern: '*.tsv'
 	//input:
 		//val Sample
 	//output:
 		//tuple val (Sample)
 	script:
 	"""
-	${params.links} $PWD/sequences/ ${params.input}
+	${params.links} ${params.outdir}/sequences/ ${params.input}
 	#${params.ifcnv} ./ ${params.bedfile}.bed ./
 	#touch -c *.bam.bai
 	mkdir ifCNV_chrwise
@@ -528,33 +526,33 @@ process ifcnv {
 
 	for i in `cat ${params.input}`
 	do
-		if [ ! -d $PWD/Final_Output/\${i}/ifCNV_chrwise ]; then
-			mkdir $PWD/Final_Output/\${i}/ifCNV_chrwise
+		if [ ! -d ${params.outdir}/Final_Output/\${i}/ifCNV_chrwise ]; then
+			mkdir ${params.outdir}/Final_Output/\${i}/ifCNV_chrwise
 		fi
 
-		if [ ! -d $PWD/Final_Output/\${i}/ifCNV_genewise ]; then
-			mkdir $PWD/Final_Output/\${i}/ifCNV_genewise
+		if [ ! -d ${params.outdir}/Final_Output/\${i}/ifCNV_genewise ]; then
+			mkdir ${params.outdir}/Final_Output/\${i}/ifCNV_genewise
 		fi
 	done
 
 	if [ -f ifCNV_chrwise/ifCNV.tsv ]; then
 		for i in `awk 'NR>1{print \$3}' ifCNV_chrwise/ifCNV.tsv | awk 'BEGIN{FS="."}{print \$1}' | sort | uniq`
 		do
-			cp ifCNV_chrwise/\${i}.*.html $PWD/Final_Output/\${i}/ifCNV_chrwise/
+			cp ifCNV_chrwise/\${i}.*.html ${params.outdir}/Final_Output/\${i}/ifCNV_chrwise/
 		done
 	fi
 
 	if [ -f ifCNV_genewise/ifCNV.tsv ]; then
 		for i in `awk 'NR>1{print \$3}' ifCNV_genewise/ifCNV.tsv | awk 'BEGIN{FS="."}{print \$1}' | sort | uniq`
 		do
-			cp ifCNV_genewise/\${i}.*.html $PWD/Final_Output/\${i}/ifCNV_genewise/
+			cp ifCNV_genewise/\${i}.*.html ${params.outdir}/Final_Output/\${i}/ifCNV_genewise/
 		done
 	fi
 	"""
 }
 
 process update_db {
-	publishDir "$PWD/work/", mode: 'copy', pattern: 'freq.txt'
+	publishDir "${params.outdir}/work/", mode: 'copy', pattern: 'freq.txt'
 	input:
 		val Sample
 	output:
@@ -574,9 +572,9 @@ process update_db {
 }
 
 process pindel {
-	publishDir "$PWD/${Sample}/pindel/", mode: 'copy', pattern: '*pindel_SI.vcf'
-	publishDir "$PWD/${Sample}/pindel/", mode: 'copy', pattern: '*.avinput'
-	publishDir "$PWD/${Sample}/pindel/", mode: 'copy', pattern: '*_pindel.hg19_multianno.csv'
+	publishDir "${params.outdir}/${Sample}/pindel/", mode: 'copy', pattern: '*pindel_SI.vcf'
+	publishDir "${params.outdir}/${Sample}/pindel/", mode: 'copy', pattern: '*.avinput'
+	publishDir "${params.outdir}/${Sample}/pindel/", mode: 'copy', pattern: '*_pindel.hg19_multianno.csv'
 	input:
 		tuple val (Sample), file(finalBam), file (finalBamBai), file (oldfinalBam), file (oldfinalBamBai)
 	output:
@@ -595,9 +593,9 @@ process pindel {
 }
 
 process combine_variants{
-	publishDir "$PWD/${Sample}/variants/", mode: 'copy'
-	publishDir "$PWD/${Sample}/variants/", mode: 'copy', pattern: '*.avinput'
-	publishDir "$PWD/${Sample}/ANNOVAR/", mode: 'copy', pattern: '*.hg19_multianno.csv'
+	publishDir "${params.outdir}/${Sample}/variants/", mode: 'copy'
+	publishDir "${params.outdir}/${Sample}/variants/", mode: 'copy', pattern: '*.avinput'
+	publishDir "${params.outdir}/${Sample}/ANNOVAR/", mode: 'copy', pattern: '*.hg19_multianno.csv'
 	input:
 		tuple val (Sample), file(freebayesVcf), file(platypusVcf)
 	output:
@@ -617,7 +615,7 @@ process combine_variants{
 }
 
 process cava {
-	publishDir "$PWD/${Sample}/CAVA/", mode: 'copy'
+	publishDir "${params.outdir}/${Sample}/CAVA/", mode: 'copy'
 	input:
 		tuple val(Sample), file (somaticVcf), file (somaticseqMultianno)
 	output:
@@ -636,7 +634,7 @@ process format_somaticseq_combined {
 		val Sample
 	script:
 	"""
-	mkdir "$PWD/${Sample}/Annovar_Modified/"
+	mkdir "${params.outdir}/${Sample}/Annovar_Modified/"
 	python3 ${params.format_somaticseq_script} ${PWD}/${Sample}/ANNOVAR/${Sample}.somaticseq.hg19_multianno.csv ${PWD}/${Sample}/Annovar_Modified/${Sample}.somaticseq.csv
 	python3 ${params.format_combined_script} ${PWD}/${Sample}/ANNOVAR/${Sample}.combined.hg19_multianno.csv ${PWD}/${Sample}/Annovar_Modified/${Sample}.combined.csv
 	"""
@@ -663,8 +661,8 @@ process format_concat_combine_somaticseq {
 
 process format_pindel {
 	//errorStrategy 'ignore'
-	publishDir "$PWD/${Sample}/pindel/", mode: 'copy', pattern: '*_final.pindel.csv'
-	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*_final.pindel.csv'
+	publishDir "${params.outdir}/${Sample}/pindel/", mode: 'copy', pattern: '*_final.pindel.csv'
+	publishDir "${params.outdir}/Final_Output/${Sample}/", mode: 'copy', pattern: '*_final.pindel.csv'
 	input:
 		tuple val (Sample), file(pindel_hg19_multianno), file(avinput), file(pindel_SI_vcf), file (sample_counts_bed), file (sample_pindel_counts_bed)	
 	output:
@@ -694,7 +692,7 @@ process merge_csv {
 	cp ${PWD}/${Sample}/Annovar_Modified/${Sample}.final.concat.csv ${Sample}.final.concat_append.csv
 	${params.vep_script_path} ${PWD}/Final_Output/${Sample}/${Sample}.somaticseq.vcf ${PWD}/Final_Output/${Sample}/${Sample}
 	${params.vep_extract_path} ${Sample}.final.concat_append.csv ${PWD}/Final_Output/${Sample}/${Sample}_vep_delheaders.txt > ${Sample}.vep
-	${params.cancervar_extract} $PWD/${Sample}/${Sample}myanno.hg19_multianno.txt.cancervar.ensemble.pred ${Sample}.vep ${Sample}_cancervar.csv
+	${params.cancervar_extract} ${params.outdir}/${Sample}/${Sample}myanno.hg19_multianno.txt.cancervar.ensemble.pred ${Sample}.vep ${Sample}_cancervar.csv
 
 	${params.pcgr_cpsr_script_path} ${PWD}/Final_Output/${Sample}/${Sample}.xlsx ${Sample}_cancervar.csv
 	cp output_temp.xlsx ${PWD}/Final_Output/${Sample}/${Sample}.xlsx
@@ -722,14 +720,14 @@ process update_freq {
 }
 
 process Final_Output {
-	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*.png'
+	publishDir "${params.outdir}/Final_Output/${Sample}/", mode: 'copy', pattern: '*.png'
 	input:
 		tuple val (Sample), file (sample_counts_bed), file (sample_pindel_counts_bed)
 	output:
 		tuple val (Sample), file ("*.png")
 	script:
 	"""
-	python3 ${params.coveragePlot_script} ${Sample} $PWD/${Sample}/coverage/${Sample}.counts.bed ./
+	python3 ${params.coveragePlot_script} ${Sample} ${params.outdir}/${Sample}/coverage/${Sample}.counts.bed ./
 	"""
 }
 process remove_files{
@@ -743,7 +741,7 @@ process remove_files{
 
 process annovar {
 	tag "${Sample}"
-	publishDir "$PWD/Final_Output/${Sample}/", mode: 'copy', pattern: '*.varscan_.csv'
+	publishDir "${params.outdir}/Final_Output/${Sample}/", mode: 'copy', pattern: '*.varscan_.csv'
 	input:
 		tuple val (Sample), file(vcf)
 		file(humandb)
